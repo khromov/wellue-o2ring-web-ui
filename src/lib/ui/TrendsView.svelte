@@ -4,6 +4,7 @@
   import { parseAny } from '../files/parse'
   import { computeStats, type RecordingStats } from '../analysis/stats'
   import UPlot from './UPlot.svelte'
+  import Icon from './Icon.svelte'
 
   type Period = 'week' | 'month' | 'year'
   let period = $state<Period>('month')
@@ -70,6 +71,10 @@
     return [inRange.map((r) => r.stats.start / 1000), inRange.map((r) => get(r.stats))]
   }
 
+  const FONT = '11px system-ui, -apple-system, "Segoe UI", sans-serif'
+  const day = (_u: uPlot, splits: number[]) =>
+    splits.map((v) => (v == null ? '' : new Date(v * 1000).toLocaleDateString([], { day: 'numeric', month: 'short' })))
+
   function opts(label: string, color: string) {
     return (width: number): uPlot.Options => ({
       width,
@@ -78,8 +83,8 @@
       cursor: { drag: { x: false, y: false } },
       scales: { x: { time: true, range: () => [range.from / 1000, range.to / 1000] } },
       axes: [
-        { stroke: css('--text-2'), grid: { stroke: css('--border') }, ticks: { stroke: css('--border') } },
-        { stroke: css('--text-2'), grid: { stroke: css('--border') }, ticks: { stroke: css('--border') }, size: 44 },
+        { stroke: css('--text-2'), font: FONT, grid: { show: false }, ticks: { show: false }, gap: 6, size: 30, space: 56, values: day },
+        { stroke: css('--text-2'), font: FONT, grid: { stroke: css('--border') }, ticks: { show: false }, gap: 6, size: 40 },
       ],
       series: [
         {},
@@ -87,7 +92,7 @@
           label,
           stroke: css(color),
           width: 2,
-          points: { show: true, size: 7, fill: css(color) },
+          points: { show: true, size: 8, width: 2, stroke: css(color), fill: css('--surface') },
         },
       ],
     })
@@ -99,32 +104,42 @@
   })
 </script>
 
-<section class="card">
+<section class="card toolbar-card">
   <div class="head">
-    <h2>Trends</h2>
-    <div class="row">
+    <div class="title">
+      <h2>Trends</h2>
+      {#if inRange.length}<span class="chip">{inRange.length} recording{inRange.length > 1 ? 's' : ''}</span>{/if}
+    </div>
+    <div class="controls">
       <div class="seg" role="group" aria-label="Period">
-        {#each ['week', 'month', 'year'] as p}
-          <button class:active={period === p} onclick={() => ((period = p as Period), (offset = 0))}>{p[0].toUpperCase() + p.slice(1)}</button>
+        {#each ['week', 'month', 'year'] as p (p)}
+          <button class:active={period === p} aria-pressed={period === p} onclick={() => ((period = p as Period), (offset = 0))}
+            >{p[0].toUpperCase() + p.slice(1)}</button
+          >
         {/each}
       </div>
-      <button onclick={() => offset--} aria-label="Previous">‹</button>
-      <span class="range">{rangeLabel}</span>
-      <button onclick={() => offset++} disabled={offset >= 0} aria-label="Next">›</button>
+      <div class="stepper">
+        <button class="ghost icon" onclick={() => offset--} aria-label="Previous"><Icon name="chevron-left" size={18} /></button>
+        <span class="range">{rangeLabel}</span>
+        <button class="ghost icon" onclick={() => offset++} disabled={offset >= 0} aria-label="Next"
+          ><Icon name="chevron-right" size={18} /></button
+        >
+      </div>
     </div>
   </div>
-  {#if inRange.length === 0}
-    <p class="muted">No recordings in this period.</p>
-  {:else}
-    <p class="muted small">{inRange.length} recording{inRange.length > 1 ? 's' : ''}</p>
-  {/if}
 </section>
 
-{#if inRange.length}
+{#if inRange.length === 0}
+  <section class="card empty">
+    <span class="empty-icon"><Icon name="trends" size={22} /></span>
+    <p class="empty-title">No recordings in this period.</p>
+    <p class="muted">Step back with ‹ to see earlier periods.</p>
+  </section>
+{:else}
   <div class="grid">
     {#each METRICS as m, i (m.key)}
-      <section class="card">
-        <h3>{m.label}</h3>
+      <section class="card chart" style="--c: var({m.color})">
+        <h3><span class="dot"></span>{m.label}</h3>
         <UPlot options={optionSets[i]} data={chartData(m.get)} height={170} />
       </section>
     {/each}
@@ -132,6 +147,9 @@
 {/if}
 
 <style>
+  .toolbar-card {
+    padding: 0.8rem 0.9rem 0.8rem 1.25rem;
+  }
   .head {
     display: flex;
     justify-content: space-between;
@@ -139,40 +157,119 @@
     flex-wrap: wrap;
     gap: 0.8rem;
   }
+  .title {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+  }
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
   .seg {
     display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 11px;
+    background: var(--surface-2);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
   }
   .seg button {
-    border: none;
-    border-radius: 0;
+    min-height: 2rem;
+    padding: 0 0.9rem;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: none;
+    color: var(--text-2);
+    font-size: var(--fs-sm);
+    font-weight: 600;
   }
-  .seg button.active {
-    background: var(--accent);
-    color: var(--accent-text);
+  .seg button:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--surface) 55%, transparent);
+    border-color: transparent;
+    color: var(--text);
+  }
+  .seg button.active,
+  .seg button.active:hover:not(:disabled) {
+    background: var(--surface);
+    border-color: var(--border);
+    color: var(--text);
+    box-shadow: 0 1px 2px rgb(16 24 40 / 8%);
+  }
+  .stepper {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
   }
   .range {
-    min-width: 11rem;
+    min-width: 10.5rem;
     text-align: center;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
   }
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1rem;
   }
-  @media (max-width: 600px) {
+  .grid > :first-child {
+    grid-column: 1 / -1;
+  }
+  @media (max-width: 760px) {
     .grid {
       grid-template-columns: 1fr;
     }
   }
-  h3 {
-    margin-bottom: 0.4rem;
+  .chart {
+    padding: 1rem 1.1rem 0.6rem;
   }
-  .small {
-    margin: 0.6rem 0 0;
-    font-size: 0.85rem;
+  h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-bottom: 0.5rem;
+    font-size: var(--fs-sm);
+    font-weight: 650;
+  }
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--c);
+  }
+  .empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 0.3rem;
+    padding: 2.6rem 1rem;
+  }
+  .empty p {
+    margin: 0;
+  }
+  .empty-title {
+    font-weight: 600;
+    margin-top: 0.4rem !important;
+  }
+  .empty-icon {
+    display: grid;
+    place-items: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    background: var(--surface-2);
+    color: var(--text-2);
+  }
+  @media (max-width: 640px) {
+    .controls {
+      width: 100%;
+      justify-content: space-between;
+    }
+    .range {
+      min-width: 0;
+    }
   }
 </style>

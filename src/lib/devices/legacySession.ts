@@ -318,7 +318,7 @@ export class LegacySession implements DeviceSession {
         spo2: ok ? r.spo2 : null,
         pr: ok ? r.pr : null,
         pi: ok && r.piRaw && r.piRaw !== 255 ? r.piRaw / 10 : null,
-        motion: r.motion === 255 ? null : r.motion,
+        motion: r.motion === 255 || !(r.leadOn || this.model.ignoreLead) ? null : r.motion,
         battery: r.battery,
         batteryState: BATTERY[r.batteryState] ?? 'normal',
         sensor: lead(r.leadOn),

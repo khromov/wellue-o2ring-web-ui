@@ -1,10 +1,12 @@
 <script lang="ts" generics="T extends string">
   import { onMount, tick } from 'svelte'
+  import Icon from './Icon.svelte'
 
   interface Item {
     id: T
     label: string
     badge?: number
+    icon?: string
   }
 
   let { items, active, onSelect }: { items: Item[]; active: T; onSelect: (id: T) => void } = $props()
@@ -52,6 +54,7 @@
         aria-current={active === it.id ? 'page' : undefined}
         onclick={() => onSelect(it.id)}
       >
+        {#if it.icon}<Icon name={it.icon} size={16} />{/if}
         {it.label}
         {#if it.badge}<span class="count">{it.badge}</span>{/if}
       </button>
@@ -71,13 +74,17 @@
   }
   .scroller {
     display: flex;
-    gap: 0.25rem;
+    gap: 2px;
     overflow-x: auto;
     scrollbar-width: none;
     scroll-behavior: smooth;
     min-width: 0;
     flex: 1;
     -webkit-overflow-scrolling: touch;
+    padding: 3px;
+    border-radius: 11px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
   }
   .scroller::-webkit-scrollbar {
     display: none;
@@ -93,23 +100,43 @@
     mask-image: linear-gradient(to right, transparent 0, #000 2rem, #000 calc(100% - 2rem), transparent 100%);
   }
   .tab {
-    border: none;
+    flex: 1 0 auto;
+    min-height: 2rem;
+    padding: 0 0.85rem;
+    border: 1px solid transparent;
+    border-radius: 8px;
     background: none;
     color: var(--text-2);
-    flex: none;
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    gap: 0.4rem;
   }
-  .tab.active {
+  .tab:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--surface) 55%, transparent);
+    border-color: transparent;
     color: var(--text);
-    background: var(--surface-2);
+  }
+  .tab.active,
+  .tab.active:hover:not(:disabled) {
+    color: var(--text);
+    background: var(--surface);
+    border-color: var(--border);
+    box-shadow: 0 1px 2px rgb(16 24 40 / 8%);
   }
   .count {
-    font-size: 0.75rem;
-    background: var(--surface-2);
+    font-size: 0.7333rem;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+    background: var(--surface-3);
+    color: var(--text-2);
     border-radius: 999px;
-    padding: 0 0.45rem;
+    min-width: 1.25rem;
+    padding: 0.05rem 0.4rem;
+    text-align: center;
   }
   .tab.active .count {
-    background: var(--border);
+    background: var(--accent);
+    color: var(--accent-text);
   }
   .arrow {
     position: absolute;
@@ -118,6 +145,7 @@
     transform: translateY(-50%);
     width: 26px;
     height: 26px;
+    min-height: 26px;
     padding: 0;
     justify-content: center;
     border-radius: 50%;

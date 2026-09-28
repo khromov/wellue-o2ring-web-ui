@@ -278,7 +278,10 @@ export function parseRtData(d: Uint8Array, t = Date.now()): LiveSample {
     spo2: valid ? spo2 : null,
     pr: valid ? pr : null,
     pi: valid && piRaw !== 0 && piRaw !== 255 ? piRaw / 10 : null,
-    motion: d[11] === 255 ? null : d[11],
+    // Motion (byte 11) is only meaningful while a finger is detected and the ring is
+    // recording (runStatus 2); during the ~2 min warm-up it reads 0. Verified on an
+    // O2Ring S: 0 when still, up to ~32 while shaking the hand.
+    motion: d[4] === 2 && d[5] === 1 && d[11] !== 255 ? d[11] : null,
     batteryState: batteryState(d[12]),
     battery: d[13],
     sensor: SENSOR[d[5]] ?? 'unknown',

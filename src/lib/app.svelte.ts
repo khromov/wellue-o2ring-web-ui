@@ -73,6 +73,8 @@ export const app = $state({
   live: null as LiveSample | null,
   liveOn: false,
   wave: [] as number[],
+  /** Recent live motion readings, one per poll (null = not available). */
+  motionHist: [] as (number | null)[],
   files: [] as StoredFile[],
   selectedId: null as string | null,
   log: [] as LogLine[],
@@ -217,6 +219,7 @@ function resetConnection() {
   app.live = null
   app.liveOn = false
   app.wave = []
+  app.motionHist = []
   app.battery = null
   app.deviceFiles = []
   app.download = null
@@ -336,6 +339,9 @@ export function cancelDownload() {
   downloadAbort?.abort()
 }
 
+/** Live motion samples kept for the trend strip (about 2 minutes at 1 poll/s). */
+export const MOTION_HISTORY = 120
+
 export function toggleLive() {
   const s = app.session
   if (!s || s.transport.kind === 'hid') return
@@ -346,8 +352,11 @@ export function toggleLive() {
   }
   app.liveOn = true
   app.wave = []
+  app.motionHist = []
   s.startLive((sample) => {
     app.live = sample
+    const m = app.motionHist.concat([sample.motion])
+    app.motionHist = m.length > MOTION_HISTORY ? m.slice(m.length - MOTION_HISTORY) : m
     if (sample.battery !== undefined && sample.batteryState) {
       app.battery = { percent: sample.battery, state: sample.batteryState, mV: app.battery?.mV }
     }

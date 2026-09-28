@@ -135,6 +135,18 @@ describe('parsers', () => {
     expect(s.wave).toEqual([10, 20, 30, 40, 50])
   })
 
+  it('RT_DATA motion is only reported while recording with a finger', () => {
+    const d = new Uint8Array(20)
+    d[4] = 1 // preparing (warm-up)
+    d[5] = 1
+    d[11] = 7
+    expect(parseRtData(d, 0).motion).toBeNull()
+    d[4] = 2
+    expect(parseRtData(d, 0).motion).toBe(7)
+    d[5] = 0 // no finger
+    expect(parseRtData(d, 0).motion).toBeNull()
+  })
+
   it('RT_DATA with invalid values', () => {
     const d = new Uint8Array(20)
     d[6] = 127

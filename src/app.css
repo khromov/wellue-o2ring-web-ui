@@ -1,47 +1,89 @@
 :root {
-  --bg: #f6f7f9;
+  /* Surfaces & text */
+  --bg: #f4f5f7;
   --surface: #ffffff;
-  --surface-2: #f0f2f5;
-  --border: #e1e4e8;
-  --text: #1a1d21;
-  --text-2: #5b636e;
-  --accent: #0a7cff;
+  --surface-2: #f1f3f6;
+  --surface-3: #e7eaef;
+  --border: #e2e5ea;
+  --border-strong: #cdd2da;
+  --text: #121418;
+  --text-2: #59616c;
+
+  /* Roles: chrome is neutral ("ink"), colour is reserved for data and status. */
+  --accent: #15181d;
   --accent-text: #ffffff;
-  --danger: #d93025;
-  --warn: #b26a00;
-  --ok: #188038;
-  --spo2: #0a7cff;
-  --pr: #e8453c;
-  --motion: #8d6cd9;
-  --shadow: 0 1px 2px rgb(0 0 0 / 6%), 0 1px 8px rgb(0 0 0 / 4%);
-  --radius: 10px;
+  --focus: #2563eb;
+  --control-on: #1f9d55;
+  --danger: #d92d20;
+  --warn: #b54708;
+  --ok: #16803c;
+
+  /* Data series: SpO2 blue, pulse rose (no longer the error red), motion violet. */
+  --spo2: #1d6ff2;
+  --pr: #e0356a;
+  --motion: #7a5af8;
+  --pleth: var(--spo2);
+
+  /* Elevation, shape */
+  --shadow: 0 1px 2px rgb(16 24 40 / 5%), 0 1px 3px rgb(16 24 40 / 6%);
+  --shadow-pop: 0 12px 32px rgb(16 24 40 / 16%), 0 2px 6px rgb(16 24 40 / 8%);
+  --radius: 14px;
+  --radius-sm: 9px;
+  --radius-xs: 6px;
+
+  /* Type scale (1rem = 15px) */
+  --fs-xs: 0.8rem; /* 12px */
+  --fs-sm: 0.8667rem; /* 13px */
+  --fs-md: 1.0667rem; /* 16px */
+  --fs-lg: 1.2rem; /* 18px */
+  --fs-xl: 1.6rem; /* 24px */
+  --fs-2xl: 2.1333rem; /* 32px */
+  --fs-display: 3.2rem; /* 48px */
+
+  /* Spacing (4px grid) */
+  --sp-1: 0.2667rem;
+  --sp-2: 0.5333rem;
+  --sp-3: 0.8rem;
+  --sp-4: 1.0667rem;
+  --sp-5: 1.6rem;
+  --sp-6: 2.1333rem;
+
+  --control-h: 2.2667rem; /* 34px */
   --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   font-size: 15px;
   line-height: 1.45;
   color: var(--text);
   background: var(--bg);
   color-scheme: light dark;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #111317;
-    --surface: #1a1d22;
-    --surface-2: #23272e;
-    --border: #2e333b;
-    --text: #e8eaed;
-    --text-2: #9aa3ad;
-    --accent: #4c9dff;
-    --danger: #ff6b5e;
-    --warn: #f0a93a;
-    --ok: #4cc47a;
-    --spo2: #4c9dff;
-    --pr: #ff6b5e;
-    --motion: #b39afc;
-    --shadow: 0 1px 2px rgb(0 0 0 / 40%);
+    --bg: #0c0e11;
+    --surface: #15181c;
+    --surface-2: #1d2126;
+    --surface-3: #262b31;
+    --border: #252a30;
+    --border-strong: #343a42;
+    --text: #eceef1;
+    --text-2: #98a1ac;
+    --accent: #eceef1;
+    --accent-text: #0c0e11;
+    --focus: #5b9cff;
+    --control-on: #32b36a;
+    --danger: #f97066;
+    --warn: #fdb022;
+    --ok: #47cd89;
+    --spo2: #5b9cff;
+    --pr: #ff6b9a;
+    --motion: #a48afb;
+    --shadow: 0 0 0 1px rgb(255 255 255 / 2%);
+    --shadow-pop: 0 16px 40px rgb(0 0 0 / 55%);
   }
 }
 
@@ -59,47 +101,105 @@ h1,
 h2,
 h3 {
   margin: 0;
-  font-weight: 600;
+  font-weight: 650;
   line-height: 1.2;
+  letter-spacing: -0.01em;
 }
 
 h2 {
-  font-size: 1.15rem;
+  font-size: var(--fs-lg);
 }
 
 h3 {
-  font-size: 0.95rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+/* Small uppercase label used for card sections, tiles and table headers. */
+.overline {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 button,
 .button {
   font: inherit;
   font-weight: 500;
+  font-size: 0.9333rem;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
-  padding: 0.45rem 0.9rem;
-  border-radius: 8px;
+  min-height: var(--control-h);
+  padding: 0 0.85rem;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  justify-content: center;
+  gap: 0.45rem;
   white-space: nowrap;
+  transition:
+    background-color 0.12s,
+    border-color 0.12s,
+    color 0.12s;
 }
 
 button:hover:not(:disabled) {
   background: var(--surface-2);
+  border-color: var(--border-strong);
+}
+
+button:active:not(:disabled) {
+  background: var(--surface-3);
 }
 
 button.primary {
+  font-weight: 600;
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-text);
 }
 
 button.primary:hover:not(:disabled) {
-  filter: brightness(1.08);
-  background: var(--accent);
+  background: color-mix(in srgb, var(--accent) 88%, var(--text));
+  border-color: transparent;
+}
+
+/* Borderless button for toolbars and secondary actions. */
+button.ghost {
+  background: transparent;
+  border-color: transparent;
+}
+
+button.ghost:hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: transparent;
+}
+
+/* Compact button for table rows and card toolbars. */
+button.small {
+  min-height: 1.8667rem;
+  font-size: var(--fs-sm);
+  border-radius: 7px;
+}
+
+/* Square icon-only button. */
+button.icon {
+  width: var(--control-h);
+  padding: 0;
 }
 
 button.danger {
@@ -107,18 +207,54 @@ button.danger {
 }
 
 button:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: default;
 }
 
+button svg,
+.button svg {
+  flex: none;
+}
+
 input,
-select {
+select,
+textarea {
   font: inherit;
   color: var(--text);
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 0.35rem 0.6rem;
+  min-height: var(--control-h);
+}
+
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: color-mix(in srgb, var(--border-strong) 60%, var(--text-2));
+}
+
+input[type='checkbox'],
+input[type='radio'] {
+  min-height: 0;
+  accent-color: var(--control-on);
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 2rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%238a929c' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.55rem center;
+  background-size: 14px;
+  cursor: pointer;
+}
+
+::placeholder {
+  color: color-mix(in srgb, var(--text-2) 80%, transparent);
 }
 
 .card {
@@ -126,7 +262,42 @@ select {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: 1rem;
+  padding: 1.2rem 1.25rem;
+}
+
+/* Status pill: neutral by default, tinted with .ok / .info / .warn / .danger. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1;
+  padding: 0.3rem 0.55rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.chip.ok {
+  color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 13%, transparent);
+}
+
+.chip.info {
+  color: var(--spo2);
+  background: color-mix(in srgb, var(--spo2) 13%, transparent);
+}
+
+.chip.warn {
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+}
+
+.chip.danger {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 13%, transparent);
 }
 
 .muted {
@@ -140,7 +311,7 @@ select {
 
 .row {
   display: flex;
-  gap: 0.6rem;
+  gap: 0.5rem;
   align-items: center;
   flex-wrap: wrap;
 }
@@ -153,14 +324,45 @@ table {
 th,
 td {
   text-align: left;
-  padding: 0.35rem 0.5rem;
+  padding: 0.5rem 0.5rem;
   border-bottom: 1px solid var(--border);
 }
 
 th {
-  font-weight: 500;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   color: var(--text-2);
-  font-size: 0.85rem;
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* uPlot renders its legend as a table: keep it out of the table styles above. */
+.u-legend th,
+.u-legend td {
+  border: 0;
+  padding: 2px 4px;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: inherit;
+  color: inherit;
+}
+
+details > summary {
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* Light palette used while re-rendering canvas charts for printing. */
@@ -171,10 +373,11 @@ th {
   --border: #d9dce1;
   --text: #000;
   --text-2: #444;
-  --spo2: #0a62cc;
-  --pr: #d0342c;
-  --motion: #6b4fc0;
+  --spo2: #0a5ad4;
+  --pr: #c8245a;
+  --motion: #5b3fd0;
   --ok: #188038;
+  --danger: #c62828;
 }
 
 @media print {
@@ -182,7 +385,9 @@ th {
     --bg: #fff;
     --surface: #fff;
     --surface-2: #f3f4f6;
+    --surface-3: #eceef2;
     --border: #d9dce1;
+    --border-strong: #c9ced6;
     --text: #000;
     --text-2: #444;
     --shadow: none;

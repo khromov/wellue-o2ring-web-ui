@@ -84,8 +84,27 @@
     min-width: 0;
   }
   .uplot-wrap :global(.u-legend) {
-    font-size: 0.8rem;
+    font-size: var(--fs-xs, 0.8rem);
     color: var(--text-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .uplot-wrap :global(.u-legend th) {
+    font-weight: 500;
+  }
+  .uplot-wrap :global(.u-legend .u-value) {
+    color: var(--text);
+    font-weight: 600;
+    padding-left: 0.2rem;
+  }
+  /* Series colour is shown next to each chart's title instead. */
+  .uplot-wrap :global(.u-legend .u-marker) {
+    display: none;
+  }
+  .uplot-wrap :global(.u-series > *) {
+    padding: 2px;
+  }
+  .uplot-wrap :global(.u-legend.u-inline tr) {
+    margin-right: 10px;
   }
   @media print {
     .uplot-wrap :global(.u-legend) {

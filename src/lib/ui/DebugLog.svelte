@@ -26,7 +26,7 @@
     </div>
   </div>
   <div class="lines mono" bind:this={el}>
-    {#each app.log as l}
+    {#each app.log as l (l)}
       <div class={l.dir}><span class="t">{ts(l.t)}</span> <span class="d">{l.dir}</span> {l.text}</div>
     {/each}
   </div>

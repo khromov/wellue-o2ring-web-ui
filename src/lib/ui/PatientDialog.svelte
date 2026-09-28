@@ -58,7 +58,7 @@
     <div class="grid">
       <label>Name <input bind:value={p.name} autocomplete="off" list="known-patients" onchange={pickKnown} /></label>
       <datalist id="known-patients">
-        {#each [...known.keys()] as n}<option value={n}></option>{/each}
+        {#each [...known.keys()] as n (n)}<option value={n}></option>{/each}
       </datalist>
       <label>ID# <input bind:value={p.id} autocomplete="off" /></label>
       <label
@@ -97,18 +97,20 @@
 <style>
   dialog {
     border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-radius: calc(var(--radius) + 2px);
     background: var(--surface);
     color: var(--text);
-    padding: 1.4rem;
+    padding: 1.5rem 1.5rem 1.25rem;
     width: min(560px, calc(100vw - 2rem));
-    box-shadow: 0 10px 40px rgb(0 0 0 / 25%);
+    box-shadow: var(--shadow-pop, 0 10px 40px rgb(0 0 0 / 25%));
   }
   dialog::backdrop {
-    background: rgb(0 0 0 / 35%);
+    background: rgb(10 12 16 / 45%);
+    backdrop-filter: blur(3px);
   }
   h2 {
-    margin-bottom: 1rem;
+    margin-bottom: 1.1rem;
+    font-size: var(--fs-lg, 1.15rem);
   }
   .grid {
     display: grid;
@@ -118,8 +120,9 @@
   label {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
-    font-size: 0.85rem;
+    gap: 0.3rem;
+    font-size: var(--fs-sm, 0.85rem);
+    font-weight: 500;
     color: var(--text-2);
   }
   label input,
@@ -130,10 +133,6 @@
     font-size: 0.95rem;
   }
   textarea {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 0.3rem 0.5rem;
     resize: vertical;
   }
   .wide {
@@ -151,7 +150,9 @@
     display: flex;
     justify-content: flex-end;
     gap: 0.6rem;
-    margin-top: 1.2rem;
+    margin: 1.3rem -1.5rem 0;
+    padding: 1rem 1.5rem 0;
+    border-top: 1px solid var(--border);
   }
   @media (max-width: 500px) {
     .grid {

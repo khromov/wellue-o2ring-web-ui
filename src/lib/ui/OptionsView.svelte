@@ -3,6 +3,7 @@
   import { clearRemoved, listFiles, deleteFile, type PatientInfo } from '../storage'
   import { fmtHeight, fmtWeight } from './format'
   import PatientDialog from './PatientDialog.svelte'
+  import Icon from './Icon.svelte'
 
   let editing = $state(false)
 
@@ -25,96 +26,200 @@
   const hasDefault = $derived(Object.values(d).some((v) => v !== undefined && v !== ''))
 </script>
 
-<section class="card">
-  <h2>Options</h2>
-  <div class="form">
-    <label class="field">
-      <span>SpO₂ chart range</span>
-      <select bind:value={app.prefs.spo2Range} onchange={savePrefs}>
-        <option value="auto">Automatic</option>
-        <option value="0-100">0–100 %</option>
-        <option value="35-100">35–100 %</option>
-        <option value="50-100">50–100 %</option>
-        <option value="70-100">70–100 %</option>
-      </select>
-    </label>
-    <label class="field">
-      <span>Pulse chart range</span>
-      <select bind:value={app.prefs.prRange} onchange={savePrefs}>
-        <option value="auto">Automatic</option>
-        <option value="25-150">25–150 bpm</option>
-        <option value="25-250">25–250 bpm</option>
-      </select>
-    </label>
-    <label class="field">
-      <span>Units</span>
-      <select bind:value={app.prefs.units} onchange={savePrefs}>
-        <option value="metric">Metric (cm, kg)</option>
-        <option value="imperial">Imperial (ft/in, lbs)</option>
-      </select>
-    </label>
-    <label class="field">
-      <span>
-        Set the device clock on connect
-        <span class="muted help">The official apps do this every time. Recording start times come from the device clock.</span>
-      </span>
-      <input type="checkbox" bind:checked={app.prefs.syncTime} onchange={savePrefs} />
-    </label>
-    <label class="field">
-      <span>Show protocol log <span class="muted help">Raw bytes sent and received, for troubleshooting.</span></span>
-      <input type="checkbox" bind:checked={app.prefs.debug} onchange={savePrefs} />
-    </label>
-    <div class="field">
-      <span>
-        Default patient information
-        <span class="muted help">
-          {#if hasDefault}
-            {[d.name, d.id, d.heightCm && fmtHeight(d.heightCm, app.prefs.units), d.weightKg && fmtWeight(d.weightKg, app.prefs.units)]
-              .filter(Boolean)
-              .join(' · ')}
-          {:else}
-            Pre-filled into new reports.
-          {/if}
+<div class="page">
+  <header class="ph">
+    <h2>Options</h2>
+    <p class="muted">Saved in this browser.</p>
+  </header>
+
+  <section class="group">
+    <h3 class="overline">Charts</h3>
+    <div class="card list">
+      <label class="field">
+        <span class="lbl">SpO₂ chart range</span>
+        <select bind:value={app.prefs.spo2Range} onchange={savePrefs}>
+          <option value="auto">Automatic</option>
+          <option value="0-100">0–100 %</option>
+          <option value="35-100">35–100 %</option>
+          <option value="50-100">50–100 %</option>
+          <option value="70-100">70–100 %</option>
+        </select>
+      </label>
+      <label class="field">
+        <span class="lbl">Pulse chart range</span>
+        <select bind:value={app.prefs.prRange} onchange={savePrefs}>
+          <option value="auto">Automatic</option>
+          <option value="25-150">25–150 bpm</option>
+          <option value="25-250">25–250 bpm</option>
+        </select>
+      </label>
+    </div>
+  </section>
+
+  <section class="group">
+    <h3 class="overline">Reports</h3>
+    <div class="card list">
+      <label class="field">
+        <span class="lbl">Units</span>
+        <select bind:value={app.prefs.units} onchange={savePrefs}>
+          <option value="metric">Metric (cm, kg)</option>
+          <option value="imperial">Imperial (ft/in, lbs)</option>
+        </select>
+      </label>
+      <div class="field">
+        <span class="lbl">
+          Default patient information
+          <span class="help">
+            {#if hasDefault}
+              {[d.name, d.id, d.heightCm && fmtHeight(d.heightCm, app.prefs.units), d.weightKg && fmtWeight(d.weightKg, app.prefs.units)]
+                .filter(Boolean)
+                .join(' · ')}
+            {:else}
+              Pre-filled into new reports.
+            {/if}
+          </span>
         </span>
-      </span>
-      <button onclick={() => (editing = true)}>Edit…</button>
+        <button onclick={() => (editing = true)}><Icon name="user" size={15} />Edit…</button>
+      </div>
     </div>
-    <div class="field">
-      <span>Stored data <span class="muted help">{app.files.length} recordings in this browser (IndexedDB).</span></span>
-      <button class="danger" disabled={!app.files.length} onclick={clearAll}>Delete all…</button>
+  </section>
+
+  <section class="group">
+    <h3 class="overline">Device</h3>
+    <div class="card list">
+      <label class="field">
+        <span class="lbl">
+          Set the device clock on connect
+          <span class="help">The official apps do this every time. Recording start times come from the device clock.</span>
+        </span>
+        <span class="switch"><input type="checkbox" role="switch" bind:checked={app.prefs.syncTime} onchange={savePrefs} /><span class="track"></span></span>
+      </label>
     </div>
-  </div>
-</section>
+  </section>
+
+  <section class="group">
+    <h3 class="overline">Data &amp; troubleshooting</h3>
+    <div class="card list">
+      <label class="field">
+        <span class="lbl">Show protocol log <span class="help">Raw bytes sent and received, for troubleshooting.</span></span>
+        <span class="switch"><input type="checkbox" role="switch" bind:checked={app.prefs.debug} onchange={savePrefs} /><span class="track"></span></span>
+      </label>
+      <div class="field">
+        <span class="lbl">Stored data <span class="help">{app.files.length} recordings in this browser (IndexedDB).</span></span>
+        <button class="danger" disabled={!app.files.length} onclick={clearAll}><Icon name="trash" size={15} />Delete all…</button>
+      </div>
+    </div>
+  </section>
+</div>
 
 {#if editing}
   <PatientDialog title="Default patient information" initial={app.prefs.defaultPatient} onSave={saveDefault} onCancel={() => (editing = false)} />
 {/if}
 
 <style>
-  h2 {
-    margin-bottom: 0.8rem;
-  }
-  .form {
+  .page {
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
     display: flex;
     flex-direction: column;
-    max-width: 640px;
+    gap: 1.4rem;
+  }
+  .ph h2 {
+    font-size: var(--fs-xl);
+    letter-spacing: -0.02em;
+  }
+  .ph p {
+    margin: 0.2rem 0 0;
+  }
+  .group h3 {
+    margin: 0 0 0.5rem 0.2rem;
+  }
+  .list {
+    padding: 0 1.1rem;
   }
   .field {
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 1rem;
-    padding: 0.65rem 0;
+    min-height: 3.4rem;
+    padding: 0.7rem 0;
     border-bottom: 1px solid var(--border);
+  }
+  label.field {
+    cursor: pointer;
   }
   .field:last-child {
     border-bottom: none;
   }
-  .field > span {
+  .lbl {
     display: flex;
     flex-direction: column;
+    gap: 0.1rem;
+    font-weight: 500;
+    min-width: 0;
   }
   .help {
-    font-size: 0.8rem;
+    font-size: var(--fs-xs);
+    font-weight: 400;
+    color: var(--text-2);
+  }
+  .field select {
+    flex: none;
+    min-width: 11rem;
+  }
+  .switch {
+    position: relative;
+    flex: none;
+    width: 42px;
+    height: 24px;
+  }
+  .switch input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+  }
+  .track {
+    position: absolute;
+    inset: 0;
+    border-radius: 999px;
+    background: var(--surface-3);
+    border: 1px solid var(--border-strong);
+    pointer-events: none;
+    transition: background-color 0.15s;
+  }
+  .track::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 30%);
+    transition: transform 0.15s;
+  }
+  .switch input:checked + .track {
+    background: var(--control-on, var(--accent));
+    border-color: transparent;
+  }
+  .switch input:checked + .track::after {
+    transform: translateX(18px);
+  }
+  .switch input:focus-visible + .track {
+    outline: 2px solid var(--focus, var(--accent));
+    outline-offset: 2px;
+  }
+  @media (max-width: 520px) {
+    .field select {
+      min-width: 0;
+      max-width: 48%;
+    }
   }
 </style>
