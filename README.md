@@ -27,6 +27,8 @@ O2 Insight Pro-style reports. Nothing leaves your browser.
   average pulse.
 - **Import** raw record files, for example files saved earlier or copied from O2 Insight's data
   folder.
+- **Backup and restore**: export everything (raw device files, a CSV per recording, remarks,
+  patient info and settings) as one ZIP, and restore it into another browser.
 
 See [OMISSIONS.md](OMISSIONS.md) for what's missing compared with the official apps, and
 [docs/PROTOCOL.md](docs/PROTOCOL.md) for the protocol and file formats.

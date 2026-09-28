@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { app, refreshStoredFiles, resetDeviceFileMarks, savePrefs } from '../app.svelte'
+  import { app, exportAllData, log, refreshStoredFiles, resetDeviceFileMarks, restoreBackup, savePrefs } from '../app.svelte'
   import { clearRemoved, listFiles, deleteFile, type PatientInfo } from '../storage'
   import { fmtHeight, fmtWeight } from './format'
   import PatientDialog from './PatientDialog.svelte'
@@ -20,6 +20,38 @@
     resetDeviceFileMarks()
     app.selectedId = null
     await refreshStoredFiles()
+  }
+
+  let backupInput: HTMLInputElement
+  let working = $state<'' | 'export' | 'restore'>('')
+  let backupMsg = $state('')
+
+  async function doExport() {
+    working = 'export'
+    backupMsg = ''
+    try {
+      await exportAllData()
+    } catch (e) {
+      app.error = `Export failed: ${e instanceof Error ? e.message : String(e)}`
+      log('error', app.error)
+    } finally {
+      working = ''
+    }
+  }
+
+  async function doRestore(file: File) {
+    if (!confirm(`Restore from ${file.name}? Recordings in the backup are added (nothing here is deleted) and the backup's settings replace the current ones.`)) return
+    working = 'restore'
+    backupMsg = ''
+    try {
+      const r = await restoreBackup(file)
+      backupMsg = `Restored: ${r.added} added, ${r.updated} updated, ${r.unchanged} already here${r.settings ? '; settings restored' : ''}.`
+    } catch (e) {
+      app.error = `Restore failed: ${e instanceof Error ? e.message : String(e)}`
+      log('error', app.error)
+    } finally {
+      working = ''
+    }
   }
 
   const d = $derived(app.prefs.defaultPatient)
@@ -104,6 +136,37 @@
         <span class="lbl">Show protocol log <span class="help">Raw bytes sent and received, for troubleshooting.</span></span>
         <span class="switch"><input type="checkbox" role="switch" bind:checked={app.prefs.debug} onchange={savePrefs} /><span class="track"></span></span>
       </label>
+      <div class="field">
+        <span class="lbl"
+          >Export all data <span class="help"
+            >A ZIP with every recording (raw device files and CSVs), remarks, patient info and settings.</span
+          ></span
+        >
+        <button disabled={!!working} onclick={doExport}
+          ><Icon name="download" size={15} />{working === 'export' ? 'Exporting…' : 'Export…'}</button
+        >
+      </div>
+      <div class="field">
+        <span class="lbl"
+          >Restore from backup <span class="help"
+            >{backupMsg || 'Adds the recordings from a backup ZIP and restores its settings. Nothing here is deleted.'}</span
+          ></span
+        >
+        <button disabled={!!working} onclick={() => backupInput.click()}
+          ><Icon name="upload" size={15} />{working === 'restore' ? 'Restoring…' : 'Restore…'}</button
+        >
+        <input
+          bind:this={backupInput}
+          type="file"
+          accept=".zip,application/zip"
+          hidden
+          onchange={(e) => {
+            const f = e.currentTarget.files?.[0]
+            e.currentTarget.value = ''
+            if (f) void doRestore(f)
+          }}
+        />
+      </div>
       <div class="field">
         <span class="lbl">Stored data <span class="help">{app.files.length} recordings in this browser (IndexedDB).</span></span>
         <button class="danger" disabled={!app.files.length} onclick={clearAll}><Icon name="trash" size={15} />Delete all…</button>

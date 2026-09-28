@@ -12,7 +12,7 @@ This web UI aims for general parity with **O2 Insight Pro** (desktop) and the ox
 | Online backup, vendor account, cloud sync | Both | This app is local-only. Recordings live in the browser's IndexedDB. |
 | Sleep staging and sleep score | ViHealth (cloud API, with native `libsleep-alg.so` as fallback) | The algorithm is proprietary: cloud-side or closed native code. O2 Insight Pro doesn't show it either. |
 | Language selection | O2 Insight Pro (EN, ZH, DE, IT, ES, FR) | The UI is English only. |
-| Data folder location | O2 Insight Pro | Browsers can't choose a folder. Use Raw file / CSV export to save files. |
+| Data folder location | O2 Insight Pro | Browsers can't choose a folder. Use Options > Export all data (ZIP backup) or the per-recording Raw file / CSV export. |
 | Deleting recordings from the device | Neither app does this in normal use (`0xF8` exists in the SDK) | Destructive, and the official apps don't expose it. |
 
 ## Different behaviour

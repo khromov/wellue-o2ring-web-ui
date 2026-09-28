@@ -18,6 +18,8 @@ import { createSession } from './devices/factory'
 import { OxyIISession } from './devices/oxyiiSession'
 import type { BatteryInfo, DeviceInfo, DeviceSession, LiveSample } from './devices/types'
 import { getFile, hasFile, listFiles, markRemoved, removedIds, saveFile, type PatientInfo, type StoredFile } from './storage'
+import { backupFileName, buildBackup, readBackup } from './backup'
+import { download } from './files/csv'
 import { sniffFormat, parseAny } from './files/parse'
 
 export interface LogLine {
@@ -412,4 +414,74 @@ export function resetDeviceFileMarks() {
     row.stored = false
     row.removed = false
   }
+}
+
+/** Export every recording, its annotations and all settings as one ZIP. */
+export async function exportAllData(): Promise<void> {
+  const files = await listFiles()
+  const settings = $state.snapshot(app.prefs) as unknown as Record<string, unknown>
+  const zip = await buildBackup(files, settings, [...removedIds()])
+  download(backupFileName(), zip as BlobPart, 'application/zip')
+  log('info', `Exported ${files.length} recordings and settings`)
+}
+
+export interface RestoreResult {
+  added: number
+  updated: number
+  unchanged: number
+  settings: boolean
+}
+
+/**
+ * Merge a backup into this browser: new recordings are added, existing ones
+ * keep their data (missing remarks / patient info are filled in from the
+ * backup), and the backup's settings replace the current ones.
+ */
+export async function restoreBackup(file: File): Promise<RestoreResult> {
+  const { manifest, bytes } = await readBackup(new Uint8Array(await file.arrayBuffer()))
+  const result: RestoreResult = { added: 0, updated: 0, unchanged: 0, settings: false }
+  for (const r of manifest.recordings) {
+    const b = bytes.get(r.id)
+    if (!b) continue
+    const { file: _path, csv: _csv, ...meta } = r
+    const existing = await getFile(r.id)
+    if (!existing) {
+      await saveFile({ ...meta, bytes: b })
+      result.added++
+    } else if (sameBytes(existing.bytes, b)) {
+      const note = existing.note || meta.note
+      const patient = existing.patient ?? meta.patient
+      if (note !== existing.note || patient !== existing.patient) {
+        await saveFile({ ...existing, note, patient })
+        result.updated++
+      } else result.unchanged++
+    } else {
+      // Same id, different recording: keep both.
+      let id = `${r.id} (restored)`
+      for (let n = 2; await hasFile(id); n++) id = `${r.id} (restored ${n})`
+      await saveFile({ ...meta, id, bytes: b })
+      result.added++
+    }
+  }
+  if (manifest.settings && typeof manifest.settings === 'object') {
+    // Only settings this app knows about, with the same value types.
+    const prefs = app.prefs as unknown as Record<string, unknown>
+    for (const [k, v] of Object.entries(manifest.settings)) {
+      if (k in prefs && typeof v === typeof prefs[k] && v !== null) prefs[k] = v
+    }
+    savePrefs()
+    result.settings = true
+  }
+  if (manifest.removedIds?.length) markRemoved(manifest.removedIds)
+  await refreshStoredFiles()
+  // Update the device list's "Downloaded" marks without talking to the device.
+  const removed = removedIds()
+  for (const row of app.deviceFiles) {
+    const id = deviceFileId(row.name)
+    if (!id) continue
+    row.stored = await hasFile(id)
+    row.removed = !row.stored && removed.has(id)
+  }
+  log('info', `Restored backup: ${result.added} added, ${result.updated} updated, ${result.unchanged} unchanged`)
+  return result
 }
