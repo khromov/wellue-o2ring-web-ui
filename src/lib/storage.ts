@@ -27,6 +27,8 @@ export interface StoredFile {
   startTime?: number
   addedAt: number
   bytes: Uint8Array
+  /** Device storage interval at download time (for recordings without a trailer yet). */
+  intervalHint?: number
   /** Free-text remark (O2 Insight "Mark"). */
   note?: string
   patient?: PatientInfo
@@ -82,6 +84,14 @@ export function removedIds(): Set<string> {
     return new Set(JSON.parse(localStorage.getItem(REMOVED_KEY) ?? '[]'))
   } catch {
     return new Set()
+  }
+}
+
+export function clearRemoved(): void {
+  try {
+    localStorage.removeItem(REMOVED_KEY)
+  } catch {
+    /* ignore */
   }
 }
 

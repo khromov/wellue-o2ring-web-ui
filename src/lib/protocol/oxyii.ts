@@ -32,7 +32,14 @@ export function encodeOxyII(cmd: number, payload: Uint8Array = new Uint8Array(0)
   return out
 }
 
-/** Accumulates a byte stream and yields complete, CRC-valid frames. */
+/** Longest frame we accept (GET_INFO protocolMaxLen is 2016 on the O2Ring S). */
+export const OXYII_MAX_PAYLOAD = 4096
+
+/**
+ * Accumulates a byte stream and yields complete, CRC-valid frames. Mirrors
+ * the SDK's hasResponse(): an incomplete candidate doesn't block scanning for
+ * a complete frame further on, and bytes before a decoded frame are dropped.
+ */
 export class OxyIIDecoder {
   private buf = new Uint8Array(0)
   /** Bytes dropped while resyncing (for diagnostics). */
@@ -46,19 +53,26 @@ export class OxyIIDecoder {
 
     const frames: OxyIIFrame[] = []
     let i = 0
+    let keepFrom = -1 // first incomplete-but-plausible candidate
     while (this.buf.length - i >= OXYII_OVERHEAD) {
       const b = this.buf
       if (b[i] !== OXYII_HEAD || ((b[i + 1] ^ b[i + 2]) & 0xff) !== 0xff) {
         i++
-        this.dropped++
         continue
       }
       const len = b[i + 5] | (b[i + 6] << 8)
+      if (len > OXYII_MAX_PAYLOAD) {
+        i++
+        continue
+      }
       const total = OXYII_OVERHEAD + len
-      if (this.buf.length - i < total) break
+      if (this.buf.length - i < total) {
+        if (keepFrom < 0) keepFrom = i
+        i++
+        continue
+      }
       if (crc8(b, i, i + total - 1) !== b[i + total - 1]) {
         i++
-        this.dropped++
         continue
       }
       frames.push({
@@ -68,8 +82,11 @@ export class OxyIIDecoder {
         payload: b.slice(i + 7, i + 7 + len),
       })
       i += total
+      keepFrom = -1
     }
-    this.buf = this.buf.slice(i)
+    const from = keepFrom >= 0 ? keepFrom : i
+    this.dropped += from
+    this.buf = this.buf.slice(from)
     return frames
   }
 

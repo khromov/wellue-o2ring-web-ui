@@ -26,11 +26,13 @@ export function o2InsightTime(ms: number): string {
  */
 export function recordingToCsv(r: Recording): string {
   const rows = ['Time,Oxygen Level(%),Pulse Rate(bpm),Motion,Oxygen Level Reminder,PR Reminder,']
+  const raw = r.raw
   for (let i = 0; i < r.spo2.length; i++) {
     const t = r.start + i * r.interval * 1000
-    rows.push(
-      `"${o2InsightTime(t)}",${r.spo2[i] ?? 255},${r.pr[i] ?? 65535},${r.motion[i] ?? 0},${r.spo2Alarm?.[i] ? 1 : 0},${r.prAlarm?.[i] ? 1 : 0},`,
-    )
+    const spo2 = raw ? raw.spo2[i] : (r.spo2[i] ?? 255)
+    const pr = raw ? raw.pr[i] : (r.pr[i] ?? 65535)
+    const motion = raw ? raw.motion[i] : (r.motion[i] ?? 0)
+    rows.push(`"${o2InsightTime(t)}",${spo2},${pr},${motion},${r.spo2Alarm?.[i] ? 1 : 0},${r.prAlarm?.[i] ? 1 : 0},`)
   }
   return rows.join('\n') + '\n'
 }

@@ -4,9 +4,19 @@ import { hex } from './protocol/bytes'
 import { BleTransport, bleSupported } from './transport/ble'
 import { HidTransport, hidSupported } from './transport/hid'
 import type { Transport } from './transport/types'
-import { allGattServices, bleNameFilters, gattProfilesFor, identifyModel, MODELS, type DeviceModel } from './devices/models'
+import {
+  allGattServices,
+  bleNameFilters,
+  gattProfilesFor,
+  identifyModel,
+  MODELS,
+  OXYII_GATT,
+  type DeviceModel,
+} from './devices/models'
+import { LegacyNoResponse } from './devices/legacySession'
 import { createSession } from './devices/factory'
-import type { BatteryInfo, DeviceSession, LiveSample } from './devices/types'
+import { OxyIISession } from './devices/oxyiiSession'
+import type { BatteryInfo, DeviceInfo, DeviceSession, LiveSample } from './devices/types'
 import { getFile, hasFile, listFiles, markRemoved, removedIds, saveFile, type PatientInfo, type StoredFile } from './storage'
 import { sniffFormat, parseAny } from './files/parse'
 
@@ -52,6 +62,8 @@ function loadPrefs(): Prefs {
 export const app = $state({
   tab: 'device' as Tab,
   session: null as DeviceSession | null,
+  /** Reactive copy of session.info (sessions are plain classes). */
+  info: null as DeviceInfo | null,
   connecting: false,
   status: '',
   error: '',
@@ -126,6 +138,19 @@ export async function connectUsb() {
   })
 }
 
+function newSession(transport: Transport, model: DeviceModel, wire: 'oxyii' | 'legacy'): DeviceSession {
+  const session = createSession(transport, model, wire)
+  session.onStatus = (m) => (app.status = m)
+  session.onWarn = (m) => log('error', m)
+  session.onDisconnect = () => {
+    if (app.session !== session) return
+    log('info', 'Device disconnected')
+    resetConnection()
+    app.error = 'Device disconnected'
+  }
+  return session
+}
+
 async function connectWith(open: () => Promise<Opened>) {
   app.error = ''
   app.connecting = true
@@ -136,16 +161,23 @@ async function connectWith(open: () => Promise<Opened>) {
     transport = opened.transport
     const model = opened.model
     attachLogging(transport)
-    const session = createSession(transport, model, opened.wire)
-    session.onStatus = (m) => (app.status = m)
-    session.onDisconnect = () => {
-      log('info', 'Device disconnected')
-      resetConnection()
-      app.error = 'Device disconnected'
-    }
     log('info', `Connected to ${transport.name} (${model.name}) via ${transport.kind.toUpperCase()}`)
-    await session.init({ syncTime: app.prefs.syncTime })
+    let session = newSession(transport, model, opened.wire)
+    try {
+      await session.init({ syncTime: app.prefs.syncTime })
+    } catch (e) {
+      // Dual-protocol rings on newer firmware keep the legacy service but only
+      // answer OxyII (the vendor app picks the service from advertising data,
+      // which browsers can't read before connecting).
+      const t = transport
+      if (!(e instanceof LegacyNoResponse) || !(t instanceof BleTransport) || !(await t.hasService(OXYII_GATT.service))) throw e
+      log('info', 'No answer on the legacy service; switching to the OxyII service')
+      await t.switchProfile(OXYII_GATT)
+      session = newSession(t, model, 'oxyii')
+      await session.init({ syncTime: app.prefs.syncTime })
+    }
     app.session = session
+    app.info = session.info ? { ...session.info } : null
     log('info', `Device info: ${JSON.stringify(session.info)}`)
     app.status = ''
     await refreshBattery()
@@ -163,8 +195,25 @@ async function connectWith(open: () => Promise<Opened>) {
   }
 }
 
+/** Re-read device info (and battery) into reactive state. */
+export async function refreshInfo() {
+  const s = app.session
+  if (!s) return
+  await s.refreshInfo()
+  if (app.session === s) app.info = s.info ? { ...s.info } : null
+  await refreshBattery()
+}
+
+export async function syncClock() {
+  const s = app.session
+  if (!s) return
+  await s.syncTime()
+  await refreshInfo()
+}
+
 function resetConnection() {
   app.session = null
+  app.info = null
   app.live = null
   app.liveOn = false
   app.wave = []
@@ -190,8 +239,12 @@ export async function refreshBattery() {
   }
 }
 
-function fileId(name: string): string {
-  return `${app.session?.info?.sn || 'device'}/${name}`
+function fileId(s: DeviceSession, name: string): string {
+  return `${s.info?.sn || 'device'}/${name}`
+}
+
+export function deviceFileId(name: string): string | null {
+  return app.session ? fileId(app.session, name) : null
 }
 
 export async function refreshDeviceFiles() {
@@ -202,7 +255,7 @@ export async function refreshDeviceFiles() {
   const rows = []
   const removed = removedIds()
   for (const name of names) {
-    const id = fileId(name)
+    const id = fileId(s, name)
     rows.push({ name, stored: await hasFile(id), removed: removed.has(id) })
   }
   app.deviceFiles = rows
@@ -228,15 +281,18 @@ export async function downloadFiles(names: string[]) {
       )
       log('info', `Downloaded ${name} (${bytes.length} B)`)
       // Keep the raw bytes even if we can't parse them (they can be exported).
+      // Recordings still in progress have no trailer yet; remember the device's
+      // storage interval so they can be shown on the right time scale.
+      const intervalHint = s instanceof OxyIISession ? s.config?.interval : undefined
       let format = 'unknown'
       let startTime: number | undefined
       try {
         format = sniffFormat(bytes)
-        startTime = parseAny(bytes, format, name).start
+        startTime = parseAny(bytes, format, name, intervalHint).start
       } catch (e) {
         log('error', `Parse ${name}: ${errText(e)}`)
       }
-      const id = fileId(name)
+      const id = fileId(s, name)
       const prev = await getFile(id)
       const dp = app.prefs.defaultPatient
       await saveFile({
@@ -248,6 +304,7 @@ export async function downloadFiles(names: string[]) {
         startTime,
         addedAt: prev?.addedAt ?? Date.now(),
         bytes,
+        intervalHint,
         // Keep user annotations on re-download.
         note: prev?.note,
         patient: prev?.patient ?? (Object.keys(dp).length ? { ...dp } : undefined),
@@ -305,16 +362,26 @@ export async function importFiles(list: FileList | File[]) {
     try {
       const format = sniffFormat(bytes)
       const rec = parseAny(bytes, format, f.name)
+      // Same name and same bytes: update in place, keeping annotations.
+      // Same name, different recording: store it next to the existing one.
+      let id = `import/${f.name}`
+      let prev = await getFile(id)
+      for (let n = 2; prev && !sameBytes(prev.bytes, bytes); n++) {
+        id = `import/${f.name} (${n})`
+        prev = await getFile(id)
+      }
       const dp = app.prefs.defaultPatient
       await saveFile({
-        id: `import/${f.name}`,
+        id,
         fileName: f.name,
         format,
         startTime: rec.start,
-        addedAt: Date.now(),
+        addedAt: prev?.addedAt ?? Date.now(),
         bytes,
-        patient: Object.keys(dp).length ? { ...dp } : undefined,
+        note: prev?.note,
+        patient: prev?.patient ?? (Object.keys(dp).length ? { ...dp } : undefined),
       })
+      app.selectedId = id
       log('info', `Imported ${f.name}`)
     } catch (e) {
       app.error = `Could not import ${f.name}: ${errText(e)}`
@@ -322,4 +389,18 @@ export async function importFiles(list: FileList | File[]) {
     }
   }
   await refreshStoredFiles()
+}
+
+function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
+  return true
+}
+
+/** After local storage was wiped: nothing on the device counts as downloaded or removed. */
+export function resetDeviceFileMarks() {
+  for (const row of app.deviceFiles) {
+    row.stored = false
+    row.removed = false
+  }
 }

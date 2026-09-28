@@ -52,6 +52,15 @@ disassembly, cross-checked with each other and with public references.
 
 ## Minor gaps
 
+- The ring only keeps its most recent recordings (4 on the tested O2Ring S) and drops the oldest
+  automatically when a new one starts. Download regularly. This app never deletes anything from
+  the device.
+- An AES key reply to AUTH that arrives after the 1 s window is ignored, and the session continues
+  in plaintext. ViHealth re-keys and resends. The tested O2Ring S never answers AUTH.
+- Some rings (branch 2D010002, reported by third parties) need a repeated AUTH + `0xE0` "hello"
+  loop before they answer over USB. The app sends AUTH once, which is enough for the tested
+  2D010001 ring.
+
 - The report's percent chart and duration tables follow O2 Insight Pro. ViHealth's paediatric
   and infant pulse-rate bands aren't used.
 - "Remark" is a single free-text field per recording, like O2 Insight Pro's "Mark".

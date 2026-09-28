@@ -53,6 +53,7 @@ export class LegacyDecoder {
     this.buf = merged
     const frames: LegacyFrame[] = []
     let i = 0
+    let keepFrom = -1
     while (this.buf.length - i >= 8) {
       const b = this.buf
       if (b[i] !== 0x55 || ((b[i + 1] ^ b[i + 2]) & 0xff) !== 0xff) {
@@ -60,16 +61,25 @@ export class LegacyDecoder {
         continue
       }
       const len = b[i + 5] | (b[i + 6] << 8)
-      if (this.buf.length - i < 8 + len) break
+      if (len > 8192) {
+        i++
+        continue
+      }
       const end = i + 8 + len
+      if (end > this.buf.length) {
+        if (keepFrom < 0) keepFrom = i
+        i++
+        continue
+      }
       if (crc8(b, i, end - 1) !== b[end - 1]) {
         i++
         continue
       }
       frames.push({ status: b[i + 1], pktNo: b[i + 3] | (b[i + 4] << 8), payload: b.slice(i + 7, i + 7 + len) })
       i = end
+      keepFrom = -1
     }
-    this.buf = this.buf.slice(i)
+    this.buf = this.buf.slice(keepFrom >= 0 ? keepFrom : i)
     return frames
   }
 

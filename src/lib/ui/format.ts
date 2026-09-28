@@ -11,10 +11,16 @@ export function fmtDur(sec: number): string {
   return `${r}s`
 }
 
+/** Height in whole inches split into feet + inches (rounded first, so never "5 ft 12 in"). */
+export function feetInches(cm: number): { ft: number; inch: number } {
+  const total = Math.round(cm / 2.54)
+  return { ft: Math.floor(total / 12), inch: total % 12 }
+}
+
 export function fmtHeight(cm: number, units: 'metric' | 'imperial'): string {
   if (units === 'metric') return `${Math.round(cm)} cm`
-  const inches = cm / 2.54
-  return `${Math.floor(inches / 12)} ft ${Math.round(inches % 12)} in`
+  const { ft, inch } = feetInches(cm)
+  return `${ft} ft ${inch} in`
 }
 
 export function fmtWeight(kg: number, units: 'metric' | 'imperial'): string {

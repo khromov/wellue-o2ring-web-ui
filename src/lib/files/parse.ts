@@ -9,7 +9,7 @@ export function sniffFormat(bytes: Uint8Array): 'oxyii' | 'legacy' {
   throw new Error('Unrecognized file format')
 }
 
-export function parseAny(bytes: Uint8Array, format?: string, fileName?: string): Recording {
+export function parseAny(bytes: Uint8Array, format?: string, fileName?: string, intervalHint?: number): Recording {
   const f = format === 'oxyii' || format === 'legacy' ? format : sniffFormat(bytes)
-  return f === 'oxyii' ? parseOxyIIFile(bytes, fileName) : parseLegacyFile(bytes)
+  return f === 'oxyii' ? parseOxyIIFile(bytes, fileName, intervalHint) : parseLegacyFile(bytes)
 }

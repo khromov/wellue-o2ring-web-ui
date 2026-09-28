@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import { app, log } from '../app.svelte'
   import type { DeviceSession, SettingDef } from '../devices/types'
+  import { READ_ONLY_BRANCH_CODES } from '../devices/models'
 
   let { session }: { session: DeviceSession } = $props()
 
@@ -9,6 +10,12 @@
   let loading = $state(false)
   let saving = $state<string | null>(null)
   let error = $state('')
+  // Bumped on every (re)load so the controls re-render from the device's values,
+  // even when a write was rejected and the value didn't change.
+  let gen = $state(0)
+  // FDA-cleared variants: ViHealth hides these settings and O2 Insight refuses the device.
+  const readOnly = $derived(READ_ONLY_BRANCH_CODES.has((app.info?.branchCode ?? '').trim()))
+  const disabled = $derived(!!saving || readOnly || !!app.download)
 
   async function load() {
     loading = true
@@ -19,6 +26,7 @@
       error = e instanceof Error ? e.message : String(e)
     } finally {
       loading = false
+      gen++
     }
   }
 
@@ -35,6 +43,7 @@
       await session.writeSetting(d.key, value)
       log('info', `Set ${d.key} = ${value}`)
       defs = await session.getSettings()
+      gen++
     } catch (e) {
       app.error = `Could not change setting: ${e instanceof Error ? e.message : String(e)}`
       log('error', app.error)
@@ -50,13 +59,17 @@
 <section class="card settings">
   <div class="head">
     <h2>Device settings</h2>
-    <button disabled={loading} onclick={load}>Reload</button>
+    <button disabled={loading || !!app.download} onclick={load}>Reload</button>
   </div>
+  {#if readOnly}
+    <p class="muted note">This device variant doesn't allow changing settings from an app.</p>
+  {/if}
   {#if error}
     <p class="err">{error}</p>
   {:else if loading && !defs.length}
     <p class="muted">Loading…</p>
   {/if}
+  {#key gen}
   <div class="form">
     {#each defs as d (d.key)}
       <div class="field">
@@ -69,7 +82,7 @@
             <input
               type="checkbox"
               checked={d.value !== 0}
-              disabled={!!saving}
+              {disabled}
               onchange={(e) => change(d, e.currentTarget.checked ? 1 : 0, e.currentTarget)}
             />
             <span></span>
@@ -77,7 +90,7 @@
         {:else}
           <select
             value={d.value}
-            disabled={!!saving}
+            {disabled}
             onchange={(e) => change(d, Number(e.currentTarget.value), e.currentTarget)}
           >
             {#each d.options ?? [] as o}
@@ -88,6 +101,7 @@
       </div>
     {/each}
   </div>
+  {/key}
 </section>
 
 <style>
@@ -121,6 +135,10 @@
   }
   .err {
     color: var(--danger);
+  }
+  .note {
+    margin: 0 0 0.6rem;
+    font-size: 0.85rem;
   }
   .switch {
     position: relative;

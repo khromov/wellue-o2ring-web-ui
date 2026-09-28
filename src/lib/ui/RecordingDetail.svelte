@@ -13,7 +13,7 @@
 
   const parsed = $derived.by(() => {
     try {
-      return { rec: parseAny(file.bytes, file.format, file.fileName), error: '' }
+      return { rec: parseAny(file.bytes, file.format, file.fileName, file.intervalHint), error: '' }
     } catch (e) {
       return { rec: null, error: e instanceof Error ? e.message : String(e) }
     }
@@ -196,6 +196,10 @@
         </div>
       </div>
 
+      {#if rec.meta.warning}
+        <p class="warn" role="alert">⚠ {rec.meta.warning}</p>
+      {/if}
+
       {#if hasPatient}
         <dl class="patient">
           {#if patient.name}<div><dt>Name</dt><dd>{patient.name}</dd></div>{/if}
@@ -262,7 +266,11 @@
     <section class="card charts">
       <div class="head">
         <h3>Trends</h3>
-        <span class="muted s no-print">Drag to zoom · shaded = ≥ 4 % drop · ticks = reminder</span>
+        <span class="muted s no-print"
+          >Drag to zoom · ticks = device reminder · shaded = ≥ 4 % drops found by the vendor algorithm{stats.dropsFromDevice
+            ? ' (the counts above are the device’s own and can differ slightly)'
+            : ''}</span
+        >
         <button class="small no-print" onclick={resetZoom}>Reset zoom</button>
       </div>
       <UPlot options={spo2Opts} data={spo2Data} height={220} {onCreate} />
@@ -466,6 +474,10 @@
   }
   .err {
     color: var(--danger);
+  }
+  .warn {
+    color: var(--warn);
+    margin: 0 0 0.8rem;
   }
   .print-only {
     display: none;

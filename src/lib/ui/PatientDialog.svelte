@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import { app } from '../app.svelte'
   import type { PatientInfo } from '../storage'
+  import { feetInches } from './format'
 
   let {
     initial,
@@ -15,13 +16,15 @@
   let p = $state<PatientInfo>({ ...initial })
   const imperial = $derived(app.prefs.units === 'imperial')
 
-  // Imperial inputs, converted to metric on save.
+  // Imperial inputs, converted to metric on save (only if the user changed them,
+  // so saving doesn't drift the stored metric values through rounding).
   // svelte-ignore state_referenced_locally
-  let ft = $state(initial.heightCm ? Math.floor(initial.heightCm / 2.54 / 12) : undefined)
+  const fi0 = initial.heightCm ? feetInches(initial.heightCm) : undefined
   // svelte-ignore state_referenced_locally
-  let inch = $state(initial.heightCm ? Math.round((initial.heightCm / 2.54) % 12) : undefined)
-  // svelte-ignore state_referenced_locally
-  let lbs = $state(initial.weightKg ? Math.round(initial.weightKg * 2.20462) : undefined)
+  const lbs0 = initial.weightKg ? Math.round(initial.weightKg * 2.20462) : undefined
+  let ft = $state(fi0?.ft)
+  let inch = $state(fi0?.inch)
+  let lbs = $state(lbs0)
 
   onMount(() => dlg.showModal())
 
@@ -41,8 +44,8 @@
     e.preventDefault()
     const out: PatientInfo = { ...p }
     if (imperial) {
-      out.heightCm = ft || inch ? ((ft ?? 0) * 12 + (inch ?? 0)) * 2.54 : undefined
-      out.weightKg = lbs ? lbs / 2.20462 : undefined
+      if (ft !== fi0?.ft || inch !== fi0?.inch) out.heightCm = ft || inch ? ((ft ?? 0) * 12 + (inch ?? 0)) * 2.54 : undefined
+      if (lbs !== lbs0) out.weightKg = lbs ? lbs / 2.20462 : undefined
     }
     for (const k of Object.keys(out) as (keyof PatientInfo)[]) if (out[k] === '' || out[k] === null) delete out[k]
     onSave(out)

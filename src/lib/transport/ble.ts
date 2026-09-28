@@ -36,7 +36,7 @@ export class BleTransport implements Transport {
     private device: BluetoothDevice,
     private writeChar: BluetoothRemoteGATTCharacteristic,
     private notifyChar: BluetoothRemoteGATTCharacteristic,
-    readonly profile: GattProfile,
+    public profile: GattProfile,
     private chunkSize: number,
   ) {
     notifyChar.addEventListener('characteristicvaluechanged', this.handleNotify)
@@ -58,21 +58,55 @@ export class BleTransport implements Transport {
 
   static async connect(device: BluetoothDevice, opts: BleConnectOptions): Promise<BleTransport> {
     if (!device.gatt) throw new Error('Device has no GATT server')
-    const server = await withTimeout(device.gatt.connect(), 20000, 'GATT connect timed out')
+    const gatt = device.gatt
+    // connect() can't be aborted; if it completes after our timeout, drop the link
+    // so the device doesn't stay connected (and invisible) in the background.
+    let timedOut = false
+    const server = await withTimeout(
+      gatt.connect().then((s) => {
+        if (timedOut) gatt.disconnect()
+        return s
+      }),
+      20000,
+      'GATT connect timed out',
+    ).catch((e) => {
+      timedOut = true
+      gatt.disconnect()
+      throw e
+    })
     let lastErr: unknown
     for (const profile of opts.profiles) {
       try {
-        const service = await server.getPrimaryService(profile.service)
-        const writeChar = await service.getCharacteristic(profile.write)
-        const notifyChar = await service.getCharacteristic(profile.notify)
-        await notifyChar.startNotifications()
+        const [writeChar, notifyChar] = await openProfile(server, profile)
         return new BleTransport(device, writeChar, notifyChar, profile, opts.chunkSize ?? 20)
       } catch (e) {
         lastErr = e
       }
     }
-    device.gatt.disconnect()
+    gatt.disconnect()
     throw new Error(`No supported GATT service found on ${device.name ?? 'device'}: ${String(lastErr)}`)
+  }
+
+  /** Move to another service on the same connection (dual-protocol devices). */
+  async switchProfile(profile: GattProfile): Promise<void> {
+    const server = this.device.gatt
+    if (!server?.connected) throw new Error('Not connected')
+    const [writeChar, notifyChar] = await openProfile(server, profile)
+    this.notifyChar.removeEventListener('characteristicvaluechanged', this.handleNotify)
+    await this.notifyChar.stopNotifications().catch(() => {})
+    this.writeChar = writeChar
+    this.notifyChar = notifyChar
+    this.profile = profile
+    notifyChar.addEventListener('characteristicvaluechanged', this.handleNotify)
+  }
+
+  hasService(service: BluetoothServiceUUID): Promise<boolean> {
+    const server = this.device.gatt
+    if (!server?.connected) return Promise.resolve(false)
+    return server.getPrimaryService(service).then(
+      () => true,
+      () => false,
+    )
   }
 
   private handleNotify = (e: Event) => {
@@ -84,7 +118,11 @@ export class BleTransport implements Transport {
   }
 
   private handleDisconnect = () => {
+    // Detach from the (reused) BluetoothDevice so a later session isn't disturbed.
+    this.device.removeEventListener('gattserverdisconnected', this.handleDisconnect)
+    this.notifyChar.removeEventListener('characteristicvaluechanged', this.handleNotify)
     if (!this.closing) this.onDisconnect()
+    this.closing = true
   }
 
   write(data: Uint8Array): Promise<void> {
@@ -114,6 +152,18 @@ export class BleTransport implements Transport {
       this.device.gatt?.disconnect()
     }
   }
+}
+
+async function openProfile(
+  server: BluetoothRemoteGATTServer,
+  profile: GattProfile,
+): Promise<[BluetoothRemoteGATTCharacteristic, BluetoothRemoteGATTCharacteristic]> {
+  const service = await server.getPrimaryService(profile.service)
+  const writeChar = await service.getCharacteristic(profile.write)
+  const notifyChar = await service.getCharacteristic(profile.notify)
+  // Notifications must be on before the first write.
+  await notifyChar.startNotifications()
+  return [writeChar, notifyChar]
 }
 
 export function withTimeout<T>(p: Promise<T>, ms: number, msg: string): Promise<T> {

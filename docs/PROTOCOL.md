@@ -66,7 +66,7 @@ A5 | cmd | ~cmd | pkgType | seq | len u16 | payload | crc8
 | `EC` | SET_TIME (O2I) | year u16, mon, day, h, m, s | ack |
 | `E1` | GET_INFO | – | 60 bytes (below) |
 | `E4` | GET_BATTERY | – | state (0 normal, 1 charging, 2 full, 3 low), %, mV u16 |
-| `F1` | GET_FILE_LIST | – | count u8 + count × 16-byte NUL-padded names (`yyyyMMddHHmmss`) |
+| `F1` | GET_FILE_LIST | – | count u8 + count × 16-byte NUL-padded names (`yyyyMMddHHmmss`). The ring keeps a fixed number of recordings (4 observed) and drops the oldest when a new one starts (HW). |
 | `F2` | READ_FILE_START | name padded to 16 + u32 0 | file size u32 |
 | `F3` | READ_FILE_DATA | u32 offset | chunk; the device picks the size (512 B over BLE, HW) |
 | `F4` | READ_FILE_END | – | ack |
@@ -171,7 +171,7 @@ the header plus samples only.
  9 size u32   13 duration u16 s   15 asleep u16   17 avg SpO2   18 min SpO2
 19 drops ≥3 %   20 drops ≥4 %   21 % <90   22 s <90 u16   24 dips <90   25 O2 score ×10
 26 steps u32   30..39 reserved
-40.. records × 5: spo2 (0xFF invalid), pr u16 (0xFFFF invalid), motion, flags (0x80 SpO2, 0x60 PR reminder)
+40.. records × 5: spo2 (0xFF invalid), pr u16 (0xFFFF invalid), motion, flags (0x80 SpO2, 0x40 PR, 0x20 motion reminder)
 ```
 
 - The interval is `duration / records` (usually 4 s).

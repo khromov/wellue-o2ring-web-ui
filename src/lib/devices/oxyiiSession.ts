@@ -25,6 +25,7 @@ import {
   type OxyIIConfig,
 } from '../protocol/oxyiiMessages'
 import type { Transport } from '../transport/types'
+import { LivePoller } from './live'
 import type { DeviceModel } from './models'
 import {
   DeviceError,
@@ -51,7 +52,8 @@ interface RequestOpts {
   timeout?: number
 }
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+/** Largest file we'll accept (O2Ring S files are capped at ~108 kB / 10 h). */
+const MAX_FILE = 4 * 1024 * 1024
 
 export class OxyIISession implements DeviceSession {
   readonly family = 'oxyii' as const
@@ -60,16 +62,20 @@ export class OxyIISession implements DeviceSession {
   encrypted = false
   onDisconnect: () => void = () => {}
   onStatus?: (msg: string) => void
+  onWarn?: (msg: string) => void
 
   private decoder = new OxyIIDecoder()
-  private seq = 0
+  // seq 1..254: never 0, so a device that always answers seq 0 can't look like it echoes.
+  private seq = 1
   private seqEchoed = false
   private aesKey: Uint8Array | null = null
   private pending: Pending | null = null
   private queue: Promise<unknown> = Promise.resolve()
-  private liveRunning = false
-  private liveLoop: Promise<void> | null = null
   private closed = false
+  private live = new LivePoller(
+    async () => parseRtData(await this.request(Cmd.RT_DATA, undefined, { timeout: 2500 })),
+    () => this.closed,
+  )
 
   constructor(
     readonly transport: Transport,
@@ -78,16 +84,19 @@ export class OxyIISession implements DeviceSession {
     transport.onData = (c) => this.onData(c)
     transport.onDisconnect = () => {
       this.closed = true
-      this.liveRunning = false
       this.failPending(new DeviceError('Device disconnected'))
       this.onDisconnect()
     }
   }
 
+  get busy(): boolean {
+    return this.live.busy
+  }
+
   private onData(chunk: Uint8Array) {
     for (const f of this.decoder.push(chunk)) {
       const p = this.pending
-      // The ring echoes seq; once we've seen that, use it to drop late replies.
+      // The O2Ring S echoes seq; once seen, use it to drop late replies.
       if (p && f.cmd === p.cmd && (f.seq === p.seq || !this.seqEchoed)) {
         if (f.seq === p.seq) this.seqEchoed = true
         clearTimeout(p.timer)
@@ -121,7 +130,7 @@ export class OxyIISession implements DeviceSession {
     // Auth and echo are always plaintext; empty payloads are never encrypted.
     if (this.aesKey && body.length > 0 && cmd !== Cmd.AUTH && cmd !== Cmd.ECHO) body = aesEncrypt(this.aesKey, body)
     const seq = this.seq
-    this.seq = (this.seq + 1) % 255
+    this.seq = this.seq >= 254 ? 1 : this.seq + 1
     const frame = encodeOxyII(cmd, body, seq)
     const timeout = opts.timeout ?? 3000
     const reply = new Promise<OxyIIFrame>((resolve, reject) => {
@@ -132,6 +141,8 @@ export class OxyIISession implements DeviceSession {
         reject,
         timer: setTimeout(() => {
           this.pending = null
+          // Drop any half-received frame so it can't stall the next reply.
+          this.decoder.reset()
           reject(new DeviceError(`Timeout waiting for reply to 0x${cmd.toString(16).padStart(2, '0')}`))
         }, timeout),
       }
@@ -168,8 +179,21 @@ export class OxyIISession implements DeviceSession {
         // No reply within 1 s: the vendor app carries on in plaintext.
       }
     }
-    await this.request(Cmd.AUTO_RT_SWITCH, new Uint8Array([0]))
-    if (opts.syncTime) await this.syncTime()
+    // Optional steps: the vendor apps only log failures here.
+    try {
+      await this.request(Cmd.AUTO_RT_SWITCH, new Uint8Array([0]))
+    } catch (e) {
+      if (this.closed) throw e
+      this.onWarn?.(`Couldn't turn off automatic live data: ${(e as Error).message}`)
+    }
+    if (opts.syncTime) {
+      try {
+        await this.syncTime()
+      } catch (e) {
+        if (this.closed) throw e
+        this.onWarn?.(`Couldn't set the device clock: ${(e as Error).message}`)
+      }
+    }
     this.onStatus?.('Reading settings…')
     try {
       this.config = parseConfig(await this.request(Cmd.GET_CONFIG))
@@ -208,18 +232,19 @@ export class OxyIISession implements DeviceSession {
   }
 
   async readFile(name: string, onProgress?: (p: ReadProgress) => void, signal?: AbortSignal): Promise<Uint8Array> {
-    const wasLive = this.liveRunning
-    if (wasLive) await this.pauseLive()
-    try {
-      const start = await this.request(Cmd.READ_FILE_START, fileNamePayload(name), { timeout: 5000 })
-      if (start.length < 4) throw new DeviceError('READ_FILE_START reply too short')
-      const size = (start[0] | (start[1] << 8) | (start[2] << 16) | (start[3] << 24)) >>> 0
-      const out = new Uint8Array(size)
-      let offset = 0
+    return this.live.exclusive(async () => {
       try {
+        const start = await this.request(Cmd.READ_FILE_START, fileNamePayload(name), { timeout: 5000 })
+        if (start.length < 4) throw new DeviceError('READ_FILE_START reply too short')
+        const size = (start[0] | (start[1] << 8) | (start[2] << 16) | (start[3] << 24)) >>> 0
+        if (size === 0) throw new DeviceError(`The device reported ${name} as empty`)
+        if (size > MAX_FILE) throw new DeviceError(`Implausible file size ${size} for ${name}`)
+        const out = new Uint8Array(size)
+        let offset = 0
         while (offset < size) {
           if (signal?.aborted) throw new DOMException('Download cancelled', 'AbortError')
           let chunk: Uint8Array | null = null
+          // Retrying the same offset is safe: late replies are dropped by seq.
           for (let attempt = 0; attempt < 3 && !chunk; attempt++) {
             try {
               chunk = await this.request(Cmd.READ_FILE_DATA, u32Payload(offset), { timeout: 6000 })
@@ -233,13 +258,12 @@ export class OxyIISession implements DeviceSession {
           offset += n
           onProgress?.({ done: offset, total: size })
         }
+        return out
       } finally {
-        await this.request(Cmd.READ_FILE_END).catch(() => {})
+        // Always close the file on the device (both vendor apps do), or later reads can wedge.
+        if (!this.closed) await this.request(Cmd.READ_FILE_END).catch(() => {})
       }
-      return out
-    } finally {
-      if (wasLive && this.liveCb) this.startLive(this.liveCb)
-    }
+    })
   }
 
   async getSettings(): Promise<SettingDef[]> {
@@ -288,52 +312,23 @@ export class OxyIISession implements DeviceSession {
       default:
         throw new DeviceError(`Unknown setting ${key}`)
     }
-    const wasLive = this.liveRunning
-    if (wasLive) await this.pauseLive()
-    try {
+    await this.live.exclusive(async () => {
       await this.request(Cmd.SET_CONFIG, setConfigPayload(type, v))
       this.config = parseConfig(await this.request(Cmd.GET_CONFIG))
-    } finally {
-      if (wasLive && this.liveCb) this.startLive(this.liveCb)
-    }
+    })
   }
-
-  private liveCb: ((s: LiveSample) => void) | null = null
 
   startLive(onSample: (s: LiveSample) => void): void {
-    this.liveCb = onSample
-    if (this.liveRunning) return
-    this.liveRunning = true
-    this.liveLoop = (async () => {
-      await sleep(300)
-      while (this.liveRunning && !this.closed) {
-        const t0 = Date.now()
-        try {
-          const d = await this.request(Cmd.RT_DATA, undefined, { timeout: 2500 })
-          if (this.liveRunning) this.liveCb?.(parseRtData(d))
-        } catch (e) {
-          if (this.closed) break
-          console.warn('RT_DATA failed', e)
-        }
-        await sleep(Math.max(0, 1000 - (Date.now() - t0)))
-      }
-    })()
+    this.live.start(onSample)
   }
 
-  private async pauseLive(): Promise<void> {
-    this.liveRunning = false
-    await this.liveLoop
-    this.liveLoop = null
-  }
-
-  async stopLive(): Promise<void> {
-    await this.pauseLive()
-    this.liveCb = null
+  stopLive(): Promise<void> {
+    return this.live.stop()
   }
 
   async close(): Promise<void> {
-    this.liveRunning = false
     this.closed = true
+    void this.live.stop()
     this.failPending(new DeviceError('Closed'))
     await this.transport.close()
   }
@@ -345,6 +340,12 @@ export function oxyiiSettingDefs(c: OxyIIConfig, model: DeviceModel): SettingDef
     for (let v = a; v <= b; v += step) out.push({ value: v, label: `${v}${unit}` })
     return out
   }
+  // Dual-protocol legacy devices running OxyII keep their own ranges and scales.
+  const r = model.legacyRanges ?? {}
+  const [sa, sb, ss] = r.oxiThr ?? [80, 95, 1]
+  const [la, lb, ls] = r.hrLow ?? [30, 70, 5]
+  const [ha, hb, hs] = r.hrHigh ?? [70, 200, 5]
+  const motorLevels = r.motor ?? [20, 40, 60, 80, 100]
   const defs: SettingDef[] = [
     {
       key: 'spo2Vibrate',
@@ -357,24 +358,18 @@ export function oxyiiSettingDefs(c: OxyIIConfig, model: DeviceModel): SettingDef
       key: 'spo2Low',
       label: 'SpO₂ threshold',
       kind: 'select',
-      options: range(80, 95, 1, ' %'),
+      options: range(sa, sb, ss, ' %'),
       value: c.spo2Low,
       help: 'Thresholds below 85 % are not recommended.',
     },
     { key: 'hrVibrate', label: 'Pulse rate reminder (vibrate)', kind: 'toggle', value: c.hrVibrate ? 1 : 0 },
-    { key: 'hrLow', label: 'Low pulse rate threshold', kind: 'select', options: range(30, 70, 5, ' bpm'), value: c.hrLow },
-    { key: 'hrHigh', label: 'High pulse rate threshold', kind: 'select', options: range(70, 200, 5, ' bpm'), value: c.hrHigh },
+    { key: 'hrLow', label: 'Low pulse rate threshold', kind: 'select', options: range(la, lb, ls, ' bpm'), value: c.hrLow },
+    { key: 'hrHigh', label: 'High pulse rate threshold', kind: 'select', options: range(ha, hb, hs, ' bpm'), value: c.hrHigh },
     {
       key: 'motor',
       label: 'Vibration strength',
       kind: 'select',
-      options: [
-        { value: 20, label: 'Weakest' },
-        { value: 40, label: 'Weak' },
-        { value: 60, label: 'Medium' },
-        { value: 80, label: 'Strong' },
-        { value: 100, label: 'Very strong' },
-      ],
+      options: motorLevels.map((value, i) => ({ value, label: ['Weakest', 'Weak', 'Medium', 'Strong', 'Very strong'][i] ?? String(value) })),
       value: c.motor,
     },
   ]

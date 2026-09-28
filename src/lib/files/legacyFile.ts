@@ -7,7 +7,7 @@
 //   17 avgSpo2, 18 minSpo2, 19 drops3, 20 drops4, 21 asleepPct,
 //   22 secBelow90 u16, 24 dropsBelow90, 25 o2Score x10, 26 steps u32,
 //   30..39 reserved, 40.. records of 5 bytes:
-//   spo2, pr u16, motion, flags (0x80 SpO2 reminder, 0x60 PR reminder)
+//   spo2, pr u16, motion, flags (0x80 SpO2 reminder, 0x40 PR reminder, 0x20 motion)
 
 import { u16le, u32le } from '../protocol/bytes'
 import type { Recording } from './recording'
@@ -60,15 +60,22 @@ export function parseLegacyFile(buf: Uint8Array): Recording {
   const motion: (number | null)[] = new Array(n)
   const spo2Alarm: boolean[] = new Array(n)
   const prAlarm: boolean[] = new Array(n)
+  const rawS = new Uint8Array(n)
+  const rawP = new Uint16Array(n)
+  const rawM = new Uint8Array(n)
   for (let i = 0; i < n; i++) {
     const o = HEADER + 5 * i * stride
     const s = buf[o]
     const p = buf[o + 1] | (buf[o + 2] << 8)
+    rawS[i] = s
+    rawP[i] = p
+    rawM[i] = buf[o + 3]
     spo2[i] = s === 0 || s === 127 || s === 255 || s > 100 ? null : s
     pr[i] = p === 0 || p === 255 || p === 511 || p === 65535 || p > 300 ? null : p
     motion[i] = buf[o + 3] === 255 ? null : buf[o + 3]
     spo2Alarm[i] = !!(buf[o + 4] & 0x80)
-    prAlarm[i] = !!(buf[o + 4] & 0x60)
+    // 0x40 = PR reminder; 0x20 is the motion reminder (Lepu SDK OxyBleFile, O2 Insight CSV).
+    prAlarm[i] = !!(buf[o + 4] & 0x40)
   }
   // The file doesn't store the interval; derive it like ViHealth.
   let interval = n ? Math.round(duration / n) : 4
@@ -84,6 +91,7 @@ export function parseLegacyFile(buf: Uint8Array): Recording {
     motion,
     spo2Alarm,
     prAlarm,
+    raw: { spo2: rawS, pr: rawP, motion: rawM },
     device: {
       avgSpo2: z(buf[17]),
       minSpo2: z(buf[18]),

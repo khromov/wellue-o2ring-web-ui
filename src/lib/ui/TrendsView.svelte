@@ -17,7 +17,7 @@
       const key = `${f.id}:${f.bytes.length}`
       if (!cache.has(key)) {
         try {
-          cache.set(key, computeStats(parseAny(f.bytes, f.format, f.fileName)))
+          cache.set(key, computeStats(parseAny(f.bytes, f.format, f.fileName, f.intervalHint)))
         } catch {
           cache.set(key, null)
         }

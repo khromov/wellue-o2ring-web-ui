@@ -39,10 +39,20 @@ export function isUnfinalisedOxyIIFile(buf: Uint8Array): boolean {
   return (
     !isOxyIIFile(buf) &&
     buf.length >= HEADER &&
+    (buf.length - HEADER) % 3 === 0 &&
     buf[0] === 1 &&
     buf[1] === 3 &&
-    buf.subarray(2, 8).every((b) => b === 0)
+    buf.subarray(2, 8).every((b) => b === 0) &&
+    // A finished file cut short still contains the trailer magic somewhere near the end.
+    !containsMagic(buf.subarray(Math.max(HEADER, buf.length - 96)))
   )
+}
+
+function containsMagic(d: Uint8Array): boolean {
+  for (let i = 0; i + 4 <= d.length; i++) {
+    if (d[i] === 0x48 && d[i + 1] === 0x12 && d[i + 2] === 0x5a && d[i + 3] === 0xda) return true
+  }
+  return false
 }
 
 /** Parse "yyyyMMddHHmmss" (optionally with a prefix or extension) as local time. */
@@ -54,7 +64,7 @@ export function timeFromFileName(name: string | undefined): number | null {
   return new Date(y, mo - 1, d, h, mi, s).getTime()
 }
 
-function parseUnfinalised(buf: Uint8Array, fileName?: string): Recording {
+function parseUnfinalised(buf: Uint8Array, fileName?: string, intervalHint?: number): Recording {
   const n = Math.floor((buf.length - HEADER) / 3)
   const spo2: (number | null)[] = new Array(n)
   const pr: (number | null)[] = new Array(n)
@@ -72,11 +82,13 @@ function parseUnfinalised(buf: Uint8Array, fileName?: string): Recording {
   }
   const start = timeFromFileName(fileName)
   if (start === null) throw new Error('Unfinalised recording without a timestamp file name')
+  // The interval isn't stored until the trailer is written: use the device's
+  // storage interval from when it was downloaded, else the 1 s default.
+  const interval = intervalHint && intervalHint > 0 && intervalHint <= 60 ? intervalHint : 1
   return {
     format: 'oxyii-unfinalised',
     start,
-    // The interval isn't stored until the trailer is written; 1 s is the ring's default.
-    interval: 1,
+    interval,
     spo2,
     pr,
     motion,
@@ -87,13 +99,13 @@ function parseUnfinalised(buf: Uint8Array, fileName?: string): Recording {
       fileVersion: buf[0],
       fileType: buf[1],
       status: 'unfinalised (no trailer yet; re-download later for device statistics)',
-      intervalAssumed: '1 s',
+      interval: intervalHint ? `${interval} s (device setting)` : '1 s (assumed)',
     },
   }
 }
 
-export function parseOxyIIFile(buf: Uint8Array, fileName?: string): Recording {
-  if (isUnfinalisedOxyIIFile(buf)) return parseUnfinalised(buf, fileName)
+export function parseOxyIIFile(buf: Uint8Array, fileName?: string, intervalHint?: number): Recording {
+  if (isUnfinalisedOxyIIFile(buf)) return parseUnfinalised(buf, fileName, intervalHint)
   if (!isOxyIIFile(buf)) throw new Error('Not an O2Ring S record file (magic missing)')
   if (buf[1] !== 3) throw new Error(`Unsupported OxyII file type ${buf[1]} (only oximetry files are supported)`)
   const T = buf.length - TRAILER
@@ -108,9 +120,16 @@ export function parseOxyIIFile(buf: Uint8Array, fileName?: string): Recording {
   const motion: (number | null)[] = new Array(n)
   const spo2Alarm: boolean[] = new Array(n)
   const prAlarm: boolean[] = new Array(n)
+  const rawS = new Uint8Array(n)
+  const rawP = new Uint16Array(n)
+  const rawM = new Uint8Array(n)
   for (let i = 0, o = HEADER; i < n; i++, o += rec) {
     const s = buf[o]
     const p = buf[o + 1]
+    // O2 Insight keeps raw values and maps only the invalid marker (PR -> 0xFFFF).
+    rawS[i] = s === inv ? 0xff : s
+    rawP[i] = p === inv ? 0xffff : p
+    rawM[i] = rec === 3 ? buf[o + 2] & 0x3f : 0
     spo2[i] = s === inv || s === 0 || s === 127 || s > 100 ? null : s
     pr[i] = p === inv || p === 0 || p === 255 ? null : p
     const f = rec === 3 ? buf[o + 2] : 0
@@ -134,6 +153,7 @@ export function parseOxyIIFile(buf: Uint8Array, fileName?: string): Recording {
     motion,
     spo2Alarm,
     prAlarm,
+    raw: { spo2: rawS, pr: rawP, motion: rawM },
     device: trustSummary
       ? {
           asleepSec: u16le(buf, T + 32),
@@ -156,6 +176,7 @@ export function parseOxyIIFile(buf: Uint8Array, fileName?: string): Recording {
       fileType: buf[1],
       deviceModel,
       checksum: checksumOk ? 'OK' : 'mismatch',
+      ...(checksumOk ? {} : { warning: 'checksum mismatch: the file may be damaged; device statistics may be wrong' }),
       sampleCount: u32le(buf, T + 12),
       bytesPerSample: rec,
     },

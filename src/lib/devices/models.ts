@@ -44,6 +44,9 @@ export const LEGACY_GATT: GattProfile = {
 
 const BABY_MOTOR = [5, 10, 17, 22, 35]
 
+/** FDA-cleared variants whose settings the vendor apps don't allow changing. */
+export const READ_ONLY_BRANCH_CODES = new Set(['2D010004', '24010007', '24010009', '24010010'])
+
 // Order matters for `contains`: more specific names first.
 export const MODELS: DeviceModel[] = [
   // ---- OxyII (0xA5) devices
@@ -67,6 +70,10 @@ export const MODELS: DeviceModel[] = [
   { id: 225, name: 'OxyU SE', family: 'legacy', contains: ['OxyU SE'], ignoreLead: true },
   { id: 69, name: 'OxyU', family: 'legacy', contains: ['OxyU'], ignoreLead: true },
   { id: 64, name: 'Sleep Sock (BBSM S1)', family: 'legacy', contains: ['BBSM S1'], legacyRanges: { oxiThr: [80, 96, 2], motor: BABY_MOTOR } },
+  // OEM rings the SDK drives with the legacy interface (not offered in ViHealth).
+  { id: 233, name: 'O2 Intg', family: 'legacy', contains: ['O2 Intg'], ignoreLead: true },
+  { id: 222, name: 'O2R WAVE', family: 'legacy', contains: ['O2R WAVE'], ignoreLead: true },
+  { id: 170, name: 'O2S', family: 'legacy', token: ['O2S'], ignoreLead: true },
   { id: 11, name: 'KidsO2', family: 'legacy', token: ['KidsO2'], legacyRanges: { hrLow: [40, 70, 5], hrHigh: [70, 220, 5], motor: BABY_MOTOR } },
   { id: 2, name: 'SnoreO2', family: 'legacy', token: ['O2BAND'] },
   { id: 6, name: 'SleepU', family: 'legacy', token: ['SleepU'], ignoreLead: true },

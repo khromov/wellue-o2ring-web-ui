@@ -4,8 +4,9 @@
     cancelDownload,
     downloadFiles,
     log,
-    refreshBattery,
     refreshDeviceFiles,
+    refreshInfo,
+    syncClock as syncDeviceClock,
   } from '../app.svelte'
   import type { DeviceSession } from '../devices/types'
   import LiveView from './LiveView.svelte'
@@ -14,7 +15,9 @@
   let { session }: { session: DeviceSession } = $props()
 
   let busy = $state(false)
-  const info = $derived(session.info)
+  const info = $derived(app.info)
+  // No other commands while a file transfer is running (the vendor apps don't mix them either).
+  const locked = $derived(busy || !!app.download)
   const newFiles = $derived(app.deviceFiles.filter((f) => !f.stored && !f.removed).map((f) => f.name))
 
   async function run(fn: () => Promise<unknown>) {
@@ -31,10 +34,7 @@
 
   function syncClock() {
     if (!confirm('Set the device clock to this computer’s current time?')) return
-    void run(async () => {
-      await session.syncTime()
-      await session.refreshInfo()
-    })
+    void run(syncDeviceClock)
   }
 
   const batteryLabel: Record<string, string> = {
@@ -79,8 +79,8 @@
       {/if}
     </dl>
     <div class="row">
-      <button disabled={busy} onclick={() => run(async () => { await session.refreshInfo(); await refreshBattery() })}>Refresh</button>
-      <button disabled={busy} onclick={syncClock}>Set clock</button>
+      <button disabled={locked} onclick={() => run(refreshInfo)}>Refresh</button>
+      <button disabled={locked} onclick={syncClock}>Set clock</button>
     </div>
   </section>
 
@@ -90,8 +90,8 @@
     <div class="head">
       <h2>Recordings on device</h2>
       <div class="row">
-        <button disabled={busy || !!app.download} onclick={() => run(refreshDeviceFiles)}>Refresh</button>
-        <button class="primary" disabled={!newFiles.length || !!app.download} onclick={() => downloadFiles(newFiles)}>
+        <button disabled={locked} onclick={() => run(refreshDeviceFiles)}>Refresh</button>
+        <button class="primary" disabled={!newFiles.length || locked} onclick={() => downloadFiles(newFiles)}>
           Download {newFiles.length ? `${newFiles.length} new` : 'new'}
         </button>
       </div>
@@ -125,7 +125,7 @@
                   >{/if}
               </td>
               <td class="right">
-                <button class="small" disabled={!!app.download} onclick={() => downloadFiles([f.name])}>
+                <button class="small" disabled={locked} onclick={() => downloadFiles([f.name])}>
                   {f.stored ? 'Re-download' : 'Download'}
                 </button>
               </td>

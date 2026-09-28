@@ -48,7 +48,7 @@
 <section class="card live" class:unavailable={usb}>
   <div class="head">
     <h2>Live</h2>
-    <button class:primary={!app.liveOn && !usb} disabled={usb} onclick={toggleLive}
+    <button class:primary={!app.liveOn && !usb} disabled={usb || (!app.liveOn && !!app.download)} onclick={toggleLive}
       >{app.liveOn ? 'Stop' : 'Start'} live view</button
     >
   </div>

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { app, refreshStoredFiles, savePrefs } from '../app.svelte'
-  import { listFiles, deleteFile, type PatientInfo } from '../storage'
+  import { app, refreshStoredFiles, resetDeviceFileMarks, savePrefs } from '../app.svelte'
+  import { clearRemoved, listFiles, deleteFile, type PatientInfo } from '../storage'
   import { fmtHeight, fmtWeight } from './format'
   import PatientDialog from './PatientDialog.svelte'
 
@@ -15,6 +15,9 @@
   async function clearAll() {
     if (!confirm('Delete ALL recordings stored in this browser? The device is not affected.')) return
     for (const f of await listFiles()) await deleteFile(f.id)
+    clearRemoved()
+    resetDeviceFileMarks()
+    app.selectedId = null
     await refreshStoredFiles()
   }
 

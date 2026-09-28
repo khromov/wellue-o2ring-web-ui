@@ -80,8 +80,12 @@ export interface DeviceSession {
   startLive(onSample: (s: LiveSample) => void): void
   stopLive(): Promise<void>
   close(): Promise<void>
+  /** True while a file transfer or setting write holds the device. */
+  readonly busy: boolean
   onDisconnect: () => void
   onStatus?: (msg: string) => void
+  /** Non-fatal problems (e.g. an optional handshake step failed). */
+  onWarn?: (msg: string) => void
 }
 
 export class DeviceError extends Error {}

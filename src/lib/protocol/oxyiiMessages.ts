@@ -103,7 +103,7 @@ export function aesDecrypt(key: Uint8Array, data: Uint8Array): Uint8Array {
 /** SET_UTC_TIME: local wall clock + UTC offset in tenths of an hour. */
 export function timePayload(d: Date = new Date()): Uint8Array {
   const y = d.getFullYear()
-  const tz = Math.round(-d.getTimezoneOffset() / 6) // minutes -> 0.1 h
+  const tz = Math.trunc(-d.getTimezoneOffset() / 6) // minutes -> 0.1 h, truncated like Java int division
   return new Uint8Array([
     y & 0xff,
     y >> 8,

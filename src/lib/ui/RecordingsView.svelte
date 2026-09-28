@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { app, importFiles, refreshStoredFiles } from '../app.svelte'
+  import { app, deviceFileId, importFiles, refreshStoredFiles } from '../app.svelte'
   import { deleteFile, markRemoved, type StoredFile } from '../storage'
   import { fmtTime } from '../files/csv'
   import RecordingDetail from './RecordingDetail.svelte'
@@ -38,9 +38,11 @@
     for (const id of ids) await deleteFile(id)
     markRemoved(ids.filter((id) => !id.startsWith('import/')))
     const gone = new Set(ids)
-    for (const row of app.deviceFiles) if (gone.has(`${app.session?.info?.sn || 'device'}/${row.name}`)) {
-      row.stored = false
-      row.removed = true
+    for (const row of app.deviceFiles) {
+      if (gone.has(deviceFileId(row.name) ?? '')) {
+        row.stored = false
+        row.removed = true
+      }
     }
     if (app.selectedId && ids.includes(app.selectedId)) app.selectedId = null
     checked = {}

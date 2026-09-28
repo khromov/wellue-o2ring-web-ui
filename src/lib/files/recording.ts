@@ -13,6 +13,11 @@ export interface Recording {
   /** Samples where the device's SpO2 / PR reminder fired. */
   spo2Alarm?: boolean[]
   prAlarm?: boolean[]
+  /**
+   * Raw per-sample values as stored (invalid markers included), for exports
+   * that must match the vendor software byte for byte.
+   */
+  raw?: { spo2: ArrayLike<number>; pr: ArrayLike<number>; motion: ArrayLike<number> }
   /** Summary values stored by the device in the file, if any. */
   device: DeviceSummary
   /** Extra raw header fields for the details table. */
