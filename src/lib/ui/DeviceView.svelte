@@ -70,7 +70,7 @@
           >
           <button class="primary" disabled={!newFiles.length || locked} onclick={() => downloadFiles(newFiles)}>
             <Icon name="download" size={16} />
-            <span><span class="dl-word">Download </span>{newFiles.length ? `${newFiles.length} new` : 'new'}</span>
+            <span><span class="dl-word">Download{' '}</span>{newFiles.length ? `${newFiles.length} new` : 'new'}</span>
           </button>
         </div>
       </div>
