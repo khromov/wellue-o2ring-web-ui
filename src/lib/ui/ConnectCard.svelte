@@ -22,7 +22,7 @@
   </div>
 
   <div class="body">
-    <p class="overline">Get started</p>
+    <p class="overline eyebrow">Get started</p>
     <h2>Connect your oximeter</h2>
     <ol class="steps">
       <li><span class="n">1</span><span>Put the ring on (or tap its screen) so it wakes up and starts advertising.</span></li>
@@ -82,10 +82,7 @@
 
     <label class="opt">
       <input type="checkbox" bind:checked={app.prefs.syncTime} onchange={savePrefs} />
-      <span>
-        Set the device clock to this computer's time on connect
-        <span class="muted">As the official apps do.</span>
-      </span>
+      <span>Set the device clock to this computer's time on connect</span>
     </label>
 
     <div class="supported">
@@ -165,7 +162,8 @@
     gap: 1rem;
     min-width: 0;
   }
-  .overline {
+  /* Pull only the "Get started" eyebrow tight to the heading. */
+  .eyebrow {
     margin: 0 0 -0.6rem;
   }
   h2 {
@@ -282,8 +280,8 @@
   .supported {
     display: flex;
     flex-direction: column;
-    gap: 0.45rem;
-    padding-top: 0.2rem;
+    gap: 0.7rem;
+    padding-top: 0.4rem;
   }
   .models {
     list-style: none;
