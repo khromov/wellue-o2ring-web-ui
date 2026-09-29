@@ -7,12 +7,40 @@ recordings, and shows O2 Insight Pro-style reports. Nothing leaves your browser.
 
 **Open the app: https://khromov.github.io/wellue-o2ring-web-ui/** (Chrome or Edge)
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/report-dark.png">
-  <img alt="Oxygen level report for one night: O₂ score, drops, SpO₂ and pulse summaries, and SpO₂, pulse and motion charts" src="docs/images/report-light.png">
-</picture>
+<table>
+  <tr>
+    <td align="center" width="25%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/images/mobile-1-connect-dark.png">
+        <img src="docs/images/mobile-1-connect-light.png" width="200" alt="Connect screen with setup steps">
+      </picture>
+      <br><sub><b>Connect</b></sub>
+    </td>
+    <td align="center" width="25%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/images/mobile-2-live-dark.png">
+        <img src="docs/images/mobile-2-live-light.png" width="200" alt="Device page with live SpO₂, pulse, pleth waveform and motion">
+      </picture>
+      <br><sub><b>Live</b></sub>
+    </td>
+    <td align="center" width="25%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/images/mobile-3-report-dark.png">
+        <img src="docs/images/mobile-3-report-light.png" width="200" alt="Oxygen level report with O₂ score, drops and SpO₂/pulse summaries">
+      </picture>
+      <br><sub><b>Report</b></sub>
+    </td>
+    <td align="center" width="25%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/images/mobile-4-trends-dark.png">
+        <img src="docs/images/mobile-4-trends-light.png" width="200" alt="Trends of O₂ score and drops over a month">
+      </picture>
+      <br><sub><b>Trends</b></sub>
+    </td>
+  </tr>
+</table>
 
-<sub>Screenshot with a generated sample night, not real patient data.</sub>
+<sub>Screenshots use generated sample nights and a made-up serial number, not real patient data.</sub>
 
 > Unofficial. Not affiliated with Wellue, Viatom or Lepu. Not a medical device.
 
