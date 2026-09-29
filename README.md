@@ -1,9 +1,18 @@
 # O2Ring Web
 
-A browser app for **Wellue / Viatom** sleep oximeters: the **O2Ring S** and the rest of the
-Viatom oximeter family (original O2Ring, Checkme O2, SleepU, and others). It connects over
-**Bluetooth** (Web Bluetooth) or USB (WebHID, O2Ring S only), downloads recordings, and shows
-O2 Insight Pro-style reports. Nothing leaves your browser.
+A browser app for most **Wellue / Viatom** sleep oximeters: the **O2Ring S** and the rest of the
+Viatom oximeter family (original O2Ring, Checkme O2, SleepU, KidsO2, BabyO2, Oxylink, and
+others). It connects over **Bluetooth** (Web Bluetooth) or USB (WebHID, O2Ring S only), downloads
+recordings, and shows O2 Insight Pro-style reports. Nothing leaves your browser.
+
+**Open the app: https://khromov.github.io/wellue-o2ring-web-ui/** (Chrome or Edge)
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/report-dark.png">
+  <img alt="Oxygen level report for one night: O₂ score, drops, SpO₂ and pulse summaries, and SpO₂, pulse and motion charts" src="docs/images/report-light.png">
+</picture>
+
+<sub>Screenshot with a generated sample night, not real patient data.</sub>
 
 > Unofficial. Not affiliated with Wellue, Viatom or Lepu. Not a medical device.
 
